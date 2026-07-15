@@ -1,0 +1,17 @@
+/target
+/data
+# /data-node2
+# /data-node3
+# /data-node4
+Cargo.lock
+*.log
+.DS_Store
+/ml_models
+/ml_states
+venv/
+benchmark_data
+# data_node*
+./ml_models/*
+/data*
+/node*
+config*
