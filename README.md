@@ -308,3 +308,9 @@ MALICIOUS_NODES="node-2" ./target/release/iiitd --config node2.toml
 ```
 
 During training, honest nodes (`node-1`, `node-3`) will evaluate `node-2`'s proposal via cosine similarity in `ml_engine.py`, observe a drop in alignment, slash its `state["alpha"]` trust score, and exclude `node-2` from the elected validator committee (`get_elected_committee`).
+
+---
+
+## 📄 License
+
+This project is licensed under the **Apache License 2.0** — see the [LICENSE](file:///mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/LICENSE) file for details.
