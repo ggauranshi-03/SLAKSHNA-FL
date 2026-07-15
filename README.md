@@ -1,10 +1,10 @@
-# SLAKSHNA-FL — Decentralized Geo-localised Personalized Federated Learning
+# SLAKSHNA — Decentralized Geo-localised Personalized Federated Learning
 
-An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA-FL** enables decentralized, privacy-preserving, trust-weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds.
+A **Peer-to-Peer Federated Learning Framework** enabled by blockchain built in Rust and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA** enables decentralized, privacy-preserving, trust-weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds. It runs on geo-localized machines distributed across different regions, sharing model updates without any central coordinator.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 - **Asynchronous Model-Lattice (Layer-1 Blockchain)**  
   Instead of traditional synchronous FL rounds (`FedAvg`) that block waiting for slow participants, SLAKSHNA-FL operates as an asynchronous lattice. Nodes continuously train on local data, broadcast compressed model deltas inside `ModelProposal` blocks, and evaluate peers asynchronously.
@@ -29,7 +29,7 @@ An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrate
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -50,7 +50,7 @@ An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrate
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technologies Used |
 | :--- | :--- |
@@ -63,7 +63,7 @@ An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrate
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 | Path | Description |
 | :--- | :--- |
@@ -82,7 +82,7 @@ An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrate
 
 ---
 
-## 🔧 Environment Setup (PATH & Variables)
+## Environment Setup (PATH & Variables)
 
 When setting up on a machine where Rust, Cargo, or Python are installed in non-standard directories (such as `/mnt/disk1/...`), configure your environment variables first before running or compiling:
 
@@ -104,7 +104,7 @@ To make these environment exports permanent, append them to your `~/.bashrc` or 
 
 ---
 
-## 🚀 Quick Start & Setup
+## Quick Start & Setup
 
 ### 1. Automated Setup (`setup.sh`)
 The easiest way to prepare Python dependencies and build the Rust L1 binary:
@@ -128,7 +128,7 @@ cargo build --release
 
 ---
 
-## ⚙️ TOML Configuration Breakdown
+## TOML Configuration Breakdown
 
 Every node requires a `.toml` configuration file (`config.toml`, `node2.toml`, `node3.toml`). 
 
@@ -181,7 +181,7 @@ master_url = "http://192.168.22.23:8545"       # Or http://127.0.0.1:8545 if loc
 
 ---
 
-## 🖥️ Running the System Locally
+## Running the System Locally
 
 ### Standalone Master Node
 ```bash
@@ -204,9 +204,9 @@ Open separate terminal windows on your machine, activate your environment, and s
 
 ---
 
-## 🌍 Over-the-Internet P2P Networking (`bore` Tunnels)
+## Over-the-Internet P2P Networking (`bore` Tunnels)
 
-When deploying nodes across different physical machines behind firewalls or NATs (without public IPs), you can use [bore](https://github.com/ekzhang/bore) (`bore-cli`) to expose local ports to the internet over public tunneling servers.
+When deploying nodes across different physical machines behind firewalls or NATs (without public IPs), Slakshna uses [bore](https://github.com/ekzhang/bore) (`bore-cli`) to expose local ports to the internet over public tunneling servers.
 
 ### Step 1: Expose Master Node Ports via `bore`
 On the machine hosting the **Master Node (`config.toml`)**, open tunnels for both the P2P port (`9000`) and the API port (`8545`):
@@ -242,7 +242,7 @@ The remote node will connect over the internet directly into your master node's 
 
 ---
 
-## 🌐 HTTP REST & WebSocket API
+## HTTP REST & WebSocket API
 
 The node exposes an Axum-powered API for monitoring lattice blocks, trust evaluations, and system status:
 
@@ -298,7 +298,7 @@ docker compose up -d --build --force-recreate
 
 ---
 
-## 🔒 Security & Malicious Node Testing
+## Security & Malicious Node Testing
 
 SLAKSHNA-FL includes built-in defense testing against model poisoning attacks. You can designate specific nodes as malicious via environment variables:
 
