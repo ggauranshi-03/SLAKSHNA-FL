@@ -3,6 +3,13 @@ import json
 import os
 import hashlib
 import socket
+
+try:
+    import setproctitle
+    setproctitle.setproctitle("BhaskeraMLEngine")
+except ImportError:
+    pass
+
 # CRITICAL: Force all caching and temp files to the massive disk1 drive 
 # because the root /home/ partition is 100% full!
 os.environ["HF_HOME"] = "/mnt/disk1/slakshna/hf_cache"

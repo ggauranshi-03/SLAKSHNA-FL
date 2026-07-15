@@ -1,19 +1,15 @@
 mod config;
 mod chain;
-mod iiitd;
-mod standards;
 mod address;
 mod state;
 mod network;
 mod api;
-mod zkp;
 
 use crate::config::Config;
 use crate::chain::Blockchain;
 use crate::state::State;
 use crate::network::Network;
 use crate::api::start_api_server;
-use ark_ff::Field;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{ info, Level };
@@ -379,7 +375,7 @@ async fn main() -> Result<(), BoxError> {
             // ==========================================
             // PHASE B: L1 CONSENSUS & L2 FINALIZATION
             // ==========================================
-            let current_l1_hash = "lattice_consensus".to_string();
+            let _current_l1_hash = "lattice_consensus".to_string();
 
             let committee = {
                 let blockchain = bc_l1.read().await;

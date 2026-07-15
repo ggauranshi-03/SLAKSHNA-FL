@@ -1,5 +1,4 @@
-
-use crate::chain::{LatticeBlock, Transaction, Blockchain, BoxError};
+use crate::chain::{LatticeBlock, Blockchain, BoxError};
 use crate::config::Config;
 use crate::state::{State, StateSnapshot};
 use crate::network::Network;
@@ -22,8 +21,6 @@ pub enum P2PMessage {
     StateSnapshot(StateSnapshot),
     NewLatticeBlock(LatticeBlock),
     GetBlock { height: u64 },
-    SubmitTx(Transaction),
-    TxConfirmed { hash: String },
     Ping,
     Pong,
 }
@@ -163,7 +160,7 @@ impl Network for StarNetwork {
 
             let peers_clone = self.peers.clone();
             let bc_clone = self.blockchain.clone();
-            let state_clone = self.state.clone();
+            let _state_clone = self.state.clone();
 
             if !master_url.is_empty() {
                 info!("Dialing master node at: {}/p2p", master_url);
@@ -242,15 +239,6 @@ impl Network for StarNetwork {
     
     async fn broadcast_lattice_block(&self, block: &LatticeBlock) -> Result<(), BoxError> {
         let msg = P2PMessage::NewLatticeBlock(block.clone());
-        let peers = self.peers.read().await;
-        for (_, peer) in peers.iter() {
-            let _ = peer.tx.send(msg.clone()).await;
-        }
-        Ok(())
-    }
-
-    async fn broadcast_tx(&self, tx: &Transaction) -> Result<(), BoxError> {
-        let msg = P2PMessage::SubmitTx(tx.clone());
         let peers = self.peers.read().await;
         for (_, peer) in peers.iter() {
             let _ = peer.tx.send(msg.clone()).await;

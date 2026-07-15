@@ -1,4 +1,4 @@
-use crate::chain::{ LatticeBlock, Transaction, Blockchain, BoxError };
+use crate::chain::{ LatticeBlock, Blockchain, BoxError };
 use crate::network::Network;
 use crate::state::State;
 use crate::network::star::P2PMessage; // Re-use your existing message enums!
@@ -18,7 +18,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{ Hash, Hasher };
 use std::sync::Arc;
 use tokio::sync::{ RwLock, mpsc };
-use tokio::io::{ AsyncRead, AsyncWrite };
 use tracing::{ info, error, debug };
 
 // 1. Define the combined Network Behaviour (Discovery + Messaging)
@@ -54,9 +53,6 @@ impl MeshNetwork {
     }
     fn l1_topic() -> gossipsub::IdentTopic {
         gossipsub::IdentTopic::new("iiitd/l1-blocks")
-    }
-    fn tx_topic() -> gossipsub::IdentTopic {
-        gossipsub::IdentTopic::new("iiitd/transactions")
     }
 }
 
@@ -99,7 +95,6 @@ impl Network for MeshNetwork {
         // Subscribe to our blockchain topics
         gossipsub.subscribe(&Self::fl_topic()).unwrap();
         gossipsub.subscribe(&Self::l1_topic()).unwrap();
-        gossipsub.subscribe(&Self::tx_topic()).unwrap();
 
         // 3. Setup mDNS (Local Peer Discovery)
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
@@ -138,7 +133,7 @@ impl Network for MeshNetwork {
         self.command_tx = Some(cmd_tx);
 
         let bc_clone = self.blockchain.clone();
-        let state_clone = self.state.clone();
+        let _state_clone = self.state.clone();
         let peers_clone = self.active_peers.clone();
 
         // 5. The Main Event Loop (Runs in the background)
@@ -149,7 +144,6 @@ impl Network for MeshNetwork {
                     Some(msg) = cmd_rx.recv() => {
                         let (topic, data) = match &msg {
                             P2PMessage::NewLatticeBlock(_) => (Self::l1_topic(), serde_json::to_vec(&msg).unwrap()),
-                            P2PMessage::SubmitTx(_) => (Self::tx_topic(), serde_json::to_vec(&msg).unwrap()),
                             _ => continue,
                         };
                         
@@ -227,13 +221,6 @@ impl Network for MeshNetwork {
     async fn broadcast_lattice_block(&self, block: &LatticeBlock) -> Result<(), BoxError> {
         if let Some(tx) = &self.command_tx {
             let _ = tx.send(P2PMessage::NewLatticeBlock(block.clone())).await;
-        }
-        Ok(())
-    }
-
-    async fn broadcast_tx(&self, transaction: &Transaction) -> Result<(), BoxError> {
-        if let Some(tx) = &self.command_tx {
-            let _ = tx.send(P2PMessage::SubmitTx(transaction.clone())).await;
         }
         Ok(())
     }
