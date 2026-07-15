@@ -1,4 +1,4 @@
-# SLAKSHNA-FL — Asynchronous Layer-1 Model-Lattice Blockchain for Federated Learning
+# SLAKSHNA-FL — Decentralized Geo-localised Personalized Federated Learning
 
 An **Asynchronous Layer-1 Model-Lattice Blockchain** built in Rust and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA-FL** enables decentralized, privacy-preserving, trust-weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds.
 
