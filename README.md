@@ -40,7 +40,7 @@ A **Peer-to-Peer Federated Learning Framework** enabled by blockchain built in R
 │                                  │                                     │
 │  • LatticeBlock & Consensus      │  • ml_engine.py Bridge              │
 │  • Committee Election (Trust)    │  • Bhaskera (Ray Train / PyTorch)   │
-│  • RocksDB State & Blockchain    │  • LoRA Fine-Tuning & SparseLoCo    │
+│  • RocksDB State                 │  • LoRA Fine-Tuning & SparseLoCo    │
 │  • Asynchronous Evaluation       │  • Opacus Differential Privacy      │
 ├──────────────────────────────────┴─────────────────────────────────────┤
 │               Libp2p Network (Gossipsub `iiitd/l1-blocks`)             │
@@ -153,7 +153,7 @@ boot_nodes = []             # Master has no boot nodes
 master_url = ""             # Empty for master node
 ```
 
-### Peer / Slave Nodes (`node2.toml` & `node3.toml`)
+### Peer Nodes (`node2.toml` & `node3.toml`)
 When running additional nodes, **each node must have a unique `data_dir`, `gpu_id`, and unique ports** (`api_port`, `ws_port`, `p2p_port`) to prevent address binding conflicts and RocksDB lock errors. Additionally, peer nodes specify the master node via `boot_nodes` and `master_url`:
 
 ```toml
@@ -271,7 +271,7 @@ The node exposes an Axum-powered API for monitoring lattice blocks, trust evalua
 
 ---
 
-## ☁️ Production Deployment (`deploy.sh`)
+## Production Deployment (`deploy.sh`)
 
 To deploy the node to a cloud VPS (e.g., DigitalOcean Droplet, AWS EC2) with Docker, Nginx, and automated Let's Encrypt SSL:
 
