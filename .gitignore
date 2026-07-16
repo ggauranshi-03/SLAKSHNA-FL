@@ -13,5 +13,3 @@ benchmark_data
 # data_node*
 ./ml_models/*
 /data*
-/node*
-config*

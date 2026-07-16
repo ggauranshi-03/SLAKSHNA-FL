@@ -11,38 +11,6 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 // Global constant for committee size
 pub const COMMITTEE_SIZE: usize = 4;
-// --- BFT-ARCHIPELAGO ALGORITHM 5 ---
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub enum BftMessage {
-//     RStep {
-//         rank: u64,
-//         block: Layer2Block,
-//         sender: String,
-//     },
-//     AStep {
-//         rank: u64,
-//         block: Layer2Block,
-//         sender: String,
-//     },
-//     BStep {
-//         rank: u64,
-//         flag: bool,
-//         block: Layer2Block,
-//         sender: String,
-//     },
-// }
-
-// #[derive(Debug, Default, Clone)]
-// pub struct BftRoundState {
-//     pub r_votes: std::collections::HashMap<String, Layer2Block>,
-//     pub a_votes: std::collections::HashMap<String, Layer2Block>,
-//     pub b_votes: std::collections::HashMap<String, (bool, Layer2Block)>,
-// }
-
-/// STEP 3: The Proposal Payload (< 1 KB)
-/// Sent by the Worker over Gossipsub. Raw transactions are EXCLUDED.
-
 
 // --- LAYER 1: ASYNCHRONOUS MODEL-LATTICE ---
 
@@ -50,7 +18,7 @@ pub const COMMITTEE_SIZE: usize = 4;
 pub enum LatticeBlockType {
     Proposal {
         payload_hash: String,
-        compressed_delta: String, // CHANGED from storage_uri
+        compressed_delta: String, 
     },
     Evaluation {
         target_node: String,

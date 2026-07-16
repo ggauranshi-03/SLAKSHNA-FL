@@ -21,7 +21,7 @@ use serde::Deserialize;
 
 // #[derive(Deserialize)]
 // struct MLEngineOutput {
-//     weights: std::collections::HashMap<String, f64>, // 👈 CHANGE THIS LINE
+//     weights: std::collections::HashMap<String, f64>,
 //     model_hash: String,
 //     validation_score: f64,
 //     metadata: String,
