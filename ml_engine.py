@@ -10,18 +10,25 @@ try:
 except ImportError:
     pass
 
-# CRITICAL: Force all caching and temp files to the massive disk1 drive 
-# because the root /home/ partition is 100% full!
-os.environ["HF_HOME"] = "/mnt/disk1/slakshna/hf_cache"
-os.environ["XDG_CACHE_HOME"] = "/mnt/disk1/slakshna/cache"
+# CONFIGURATION - dynamically resolve BASE_DIR first so cache/temp dirs can use it cleanly
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Setup caching directories relative to BASE_DIR unless overridden by user environment
+if "HF_HOME" not in os.environ:
+    os.environ["HF_HOME"] = os.path.join(BASE_DIR, "cache", "hf")
+if "XDG_CACHE_HOME" not in os.environ:
+    os.environ["XDG_CACHE_HOME"] = os.path.join(BASE_DIR, "cache", "xdg")
+os.makedirs(os.environ["HF_HOME"], exist_ok=True)
+os.makedirs(os.environ["XDG_CACHE_HOME"], exist_ok=True)
 
 # Isolate temp directories per node to prevent Ray GCS collisions
 # CRITICAL: Linux AF_UNIX sockets strictly fail if path > 107 chars! 
-# We must keep the temp path ultra-short by using just the last 6 chars of the node ID.
+# We use /tmp/sl_t/{short_id} (or BASE_DIR/t/{short_id} if short enough) to keep socket paths short across all machines.
 if len(sys.argv) > 1 and sys.argv[1] != "--help":
     my_id_arg = sys.argv[1]
     short_id = my_id_arg[-6:] if len(my_id_arg) > 6 else my_id_arg
-    node_tmp = f"/mnt/disk1/slakshna/t/{short_id}"
+    target_t = os.path.join(BASE_DIR, "t", short_id)
+    node_tmp = target_t if len(target_t) < 80 else os.path.join("/tmp", "sl_t", short_id)
     os.makedirs(node_tmp, exist_ok=True)
     os.environ["RAY_TMPDIR"] = node_tmp
     os.environ["TMPDIR"] = node_tmp
@@ -34,9 +41,11 @@ if len(sys.argv) > 1 and sys.argv[1] != "--help":
     os.environ["RAY_NODE_MANAGER_PORT"] = str(13000 + port_offset)
     os.environ["RAY_OBJECT_MANAGER_PORT"] = str(14000 + port_offset)
 else:
-    os.makedirs("/mnt/disk1/slakshna/t/shared", exist_ok=True)
-    os.environ["RAY_TMPDIR"] = "/mnt/disk1/slakshna/t/shared"
-    os.environ["TMPDIR"] = "/mnt/disk1/slakshna/t/shared"
+    target_shared = os.path.join(BASE_DIR, "t", "shared")
+    shared_tmp = target_shared if len(target_shared) < 80 else os.path.join("/tmp", "sl_t", "shared")
+    os.makedirs(shared_tmp, exist_ok=True)
+    os.environ["RAY_TMPDIR"] = shared_tmp
+    os.environ["TMPDIR"] = shared_tmp
 
 import torch
 import numpy as np
@@ -46,9 +55,6 @@ import subprocess
 import yaml
 import base64
 import io
-
-# CONFIGURATION
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
 STATE_DIR = os.path.join(BASE_DIR, "ml_states")
 DATA_DIR = os.path.join(BASE_DIR, "data")

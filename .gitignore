@@ -1,15 +1,35 @@
+# Rust Build
 /target
-/data
-# /data-node2
-# /data-node3
-# /data-node4
 Cargo.lock
-*.log
-.DS_Store
+
+# Python / Virtualenv
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Runtime generated configs (created by ml_engine.py / orchestrator after running)
+config_iiitd*.yaml
+config_node*.yaml
+config_[0-9]*.yaml
+
+# Runtime generated data, logs, states, and checkpoints (created after running)
+/data*
 /ml_models
 /ml_states
-venv/
-benchmark_data
-# data_node*
-./ml_models/*
-/data*
+/t
+/cache
+benchmark_data/
+*.log
+epoch_loss_tracking.csv
+trust_scores*.csv
+accuracy_scores.csv
+malicious_nodes.txt
+
+# OS
+.DS_Store
+
+# Explicitly ensure source code and template configs are NEVER ignored
+!node_template.yaml
+!config.toml
+!node*.toml
