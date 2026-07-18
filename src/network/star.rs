@@ -154,7 +154,7 @@ impl Network for StarNetwork {
         if is_master {
             info!("Starting P2P server for master node...");
         } else {
-            let master_url = self.config.network.star.master_url.clone();
+            let master_url = self.config.network.star.as_ref().unwrap().master_url.clone();
             let my_node_id = self.config.node.id.clone();
             let my_node_type = self.config.node.node_type.clone();
 
