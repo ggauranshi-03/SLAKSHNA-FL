@@ -170,13 +170,18 @@ host = "0.0.0.0"
 p2p_port = 9001             # Unique P2P port per node (9001, 9002...)
 api_port = 8555             # Unique API port per node (8555, 8565...)
 ws_port = 8547              # Unique WS port per node
+data_dir = "./data-node2"   
+gpu_id = 1                  
 
-# Connect to the master node's P2P address:
-boot_nodes = ["/ip4/192.168.22.23/tcp/9000"]   # Or /ip4/127.0.0.1/tcp/9000 if local
+[network]
+topology = "mesh"
+host = "0.0.0.0"
+p2p_port = 9001             
+api_port = 8555             
+ws_port = 8547              
 
-[network.star]
-# Connect to the master node's HTTP API endpoint:
-master_url = "http://192.168.22.23:8545"       # Or http://127.0.0.1:8545 if local
+# Point boot_nodes to the Master Node's Iroh ID:
+boot_nodes = ["<MASTER_NODE_ID>"]
 ```
 
 ---
@@ -192,34 +197,17 @@ master_url = "http://192.168.22.23:8545"       # Or http://127.0.0.1:8545 if loc
 Open separate terminal windows on your machine, activate your environment, and start each node:
 
 ```bash
-# Terminal 1 — Master / Bootstrap Node (`config.toml` on ports 8545 / 9000)
+# Terminal 1 — Master / Bootstrap Node
 ./target/release/iiitd --config config.toml
 
-# Terminal 2 — Peer Node 2 (`node2.toml` on ports 8555 / 9001)
+# Terminal 2 — Peer Node 2
 ./target/release/iiitd --config node2.toml
 
-# Terminal 3 — Peer Node 3 (`node3.toml` on ports 8565 / 9002)
+# Terminal 3 — Peer Node 3
 ./target/release/iiitd --config node3.toml
 ```
 
 ---
-
-## Over-the-Internet P2P Networking (`bore` Tunnels)
-
-When deploying nodes across different physical machines behind firewalls or NATs (without public IPs), Slakshna uses [bore](https://github.com/ekzhang/bore) (`bore-cli`) to expose local ports to the internet over public tunneling servers.
-
-### Step 1: Expose Master Node Ports via `bore`
-On the machine hosting the **Master Node (`config.toml`)**, open tunnels for both the P2P port (`9000`) and the API port (`8545`):
-
-```bash
-# Terminal A: Expose Master P2P Port (9000)
-bore local 9000 --to bore.pub
-# Output: listening at bore.pub:34812 (Save this assigned port!)
-
-# Terminal B: Expose Master API Port (8545)
-bore local 8545 --to bore.pub
-# Output: listening at bore.pub:41205 (Save this assigned port!)
-```
 
 ### Step 2: Configure Remote Peer Nodes Over the Internet
 On the remote machine hosting Node 2 or Node 3, edit your `.toml` configuration file (`node2.toml`) to use the public `bore.pub` addresses:

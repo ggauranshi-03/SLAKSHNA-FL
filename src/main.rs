@@ -396,7 +396,7 @@ async fn main() -> Result<(), BoxError> {
     info!("==================================================");
     info!("🟢 Node is LIVE (Federated Learning Consensus Active)");
     info!("==================================================");
-    info!("P2P:  ws://{}:{}", config.network.host, config.network.p2p_port);
+    info!("Transport: Iroh QUIC (with automatic STUN + DERP relay)");
     info!("WS:   ws://{}:{}", config.network.host, config.network.ws_port);
     info!("API:  http://{}:{}", config.network.host, config.network.api_port);
     info!("==================================================");

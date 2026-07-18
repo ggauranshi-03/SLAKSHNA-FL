@@ -1,215 +1,211 @@
-use crate::chain::{ LatticeBlock, Blockchain, BoxError };
+use crate::chain::{LatticeBlock, Blockchain, BoxError};
 use crate::network::Network;
 use crate::state::State;
-use crate::network::star::P2PMessage; // Re-use your existing message enums!
-use futures::StreamExt;
+use crate::network::star::P2PMessage;
 use async_trait::async_trait;
-use libp2p::{
-    gossipsub,
-    mdns,
-    noise,
-    swarm::NetworkBehaviour,
-    swarm::SwarmEvent,
-    tcp,
-    yamux,
-    SwarmBuilder,
-};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{ Hash, Hasher };
+use iroh::Endpoint;
+use iroh::endpoint::presets;
+use iroh::protocol::Router;
+use iroh_gossip::net::{Gossip};
+use iroh_gossip::ALPN;
+use futures::StreamExt;
 use std::sync::Arc;
-use tokio::sync::{ RwLock, mpsc };
-use tracing::{ info, error, debug };
+use tokio::sync::{RwLock, mpsc};
+use tracing::{info, error, debug, warn};
 
-// 1. Define the combined Network Behaviour (Discovery + Messaging)
-#[derive(NetworkBehaviour)]
-struct MvmBehaviour {
-    gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
+/// 32-byte topic identifier for the SLAKSHNA FL Lattice gossip channel.
+/// Derived deterministically so all nodes with the same chain_id join the same swarm.
+fn topic_from_chain_id(chain_id: &str) -> iroh_gossip::TopicId {
+    use sha2::{Sha256, Digest};
+    let hash = Sha256::digest(chain_id.as_bytes());
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(&hash);
+    iroh_gossip::TopicId::from_bytes(bytes)
 }
 
 pub struct MeshNetwork {
     config: crate::config::Config,
     blockchain: Arc<RwLock<Blockchain>>,
+    #[allow(dead_code)]
     state: Arc<RwLock<State>>,
-    // Channel to send broadcast commands to the background Swarm task
+    /// Channel for the rest of the application to send broadcast commands into the gossip loop
     command_tx: Option<mpsc::Sender<P2PMessage>>,
     active_peers: Arc<RwLock<Vec<String>>>,
+    node_id_iroh: Arc<RwLock<Option<String>>>,
+    _router: Option<iroh::protocol::Router>,
+    _endpoint: Option<iroh::Endpoint>,
 }
 
 impl MeshNetwork {
-    pub fn new(config: crate::config::Config, blockchain: Arc<RwLock<Blockchain>>, state: Arc<RwLock<State>>) -> Self {
+    pub fn new(
+        config: crate::config::Config,
+        blockchain: Arc<RwLock<Blockchain>>,
+        state: Arc<RwLock<State>>,
+    ) -> Self {
         MeshNetwork {
             config,
             blockchain,
             state,
             command_tx: None,
             active_peers: Arc::new(RwLock::new(Vec::new())),
+            node_id_iroh: Arc::new(RwLock::new(None)),
+            _router: None,
+            _endpoint: None,
         }
-    }
-
-    // Helper to define our network topics
-    fn fl_topic() -> gossipsub::IdentTopic {
-        gossipsub::IdentTopic::new("iiitd/fl-work")
-    }
-    fn l1_topic() -> gossipsub::IdentTopic {
-        gossipsub::IdentTopic::new("iiitd/l1-blocks")
     }
 }
 
 #[async_trait]
 impl Network for MeshNetwork {
     async fn start(&mut self) -> Result<(), BoxError> {
-        info!("🌐 Starting libp2p Mesh Network (Gossipsub + mDNS)...");
+        info!("🌐 Starting Iroh Mesh Network (QUIC + Gossip + DERP)...");
 
-        // 1. Create a cryptographic identity for this node
-        let local_key = libp2p::identity::Keypair::generate_ed25519();
-        let local_peer_id = libp2p::PeerId::from(local_key.public());
-        info!("Local Peer ID: {}", local_peer_id);
+        // 1. Create the Iroh Endpoint with Minimal preset to bypass all PKARR/TLS certificate issues
+        let bind_addr: std::net::SocketAddr = format!("0.0.0.0:{}", self.config.network.p2p_port).parse().unwrap();
+        let endpoint = Endpoint::builder(presets::Minimal)
+            .relay_mode(iroh::RelayMode::Disabled)
+            .bind_addr(bind_addr).map_err(|e| format!("Failed to set bind_addr: {}", e))?
+            .bind()
+            .await
+            .map_err(|e| format!("Failed to bind Iroh endpoint: {}", e))?;
 
-        // 2. Setup Gossipsub (The Mesh Routing Protocol)
-        let message_id_fn = |message: &gossipsub::Message| {
-            let mut s = DefaultHasher::new();
-            message.data.hash(&mut s);
-            gossipsub::MessageId::from(s.finish().to_string())
-        };
+        let node_id = endpoint.id();
+        let my_addr = endpoint.addr();
+        info!("🔑 Iroh NodeId: {}\nNodeAddr: {:?}", node_id, my_addr);
+        {
+            let mut nid = self.node_id_iroh.write().await;
+            *nid = Some(node_id.to_string());
+        }
 
-        // let gossipsub_config = gossipsub::ConfigBuilder
-        //     ::default()
-        //     .heartbeat_interval(std::time::Duration::from_secs(1))
-        //     .message_id_fn(message_id_fn)
-        //     .build()
-        //     .map_err(|e| e.to_string())?;
-        // Inside MeshNetwork::start() around line 76
-        let gossipsub_config = gossipsub::ConfigBuilder
-            ::default()
-            .heartbeat_interval(std::time::Duration::from_secs(1))
-            .max_transmit_size(15 * 1024 * 1024) // NEW: Allow up to 15 MB payloads
-            .message_id_fn(message_id_fn)
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        let mut gossipsub = gossipsub::Behaviour
-            ::new(gossipsub::MessageAuthenticity::Signed(local_key.clone()), gossipsub_config)
-            .map_err(|e| e.to_string())?;
-
-        // Subscribe to our blockchain topics
-        gossipsub.subscribe(&Self::fl_topic()).unwrap();
-        gossipsub.subscribe(&Self::l1_topic()).unwrap();
-
-        // 3. Setup mDNS (Local Peer Discovery)
-        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
-
-        // 4. Build the Swarm
-        let behaviour = MvmBehaviour { gossipsub, mdns };
-        let mut swarm = SwarmBuilder::with_existing_identity(local_key)
-            .with_tokio()
-            .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)?
-            .with_quic()
-            .with_behaviour(|_| behaviour)?
-            .build();
-
-        // Listen on all interfaces on the configured P2P port deterministically
-        let listen_quic = format!("/ip4/0.0.0.0/udp/{}/quic-v1", self.config.network.p2p_port);
-        let listen_tcp  = format!("/ip4/0.0.0.0/tcp/{}", self.config.network.p2p_port);
-        swarm.listen_on(listen_quic.parse()?)?;
-        swarm.listen_on(listen_tcp.parse()?)?;
+        // 2. Start Gossip Router
+        let gossip = Gossip::builder().spawn(endpoint.clone());
         
-        // Explicitly dial bootnodes if provided in TOML for internet P2P connectivity
+        // 3. Setup Iroh Router to accept incoming gossip connections via ALPN
+        let router = Router::builder(endpoint.clone())
+            .accept(ALPN, gossip.clone())
+            .spawn();
+
+        self._router = Some(router);
+        self._endpoint = Some(endpoint.clone());
+
+        info!("📡 Iroh Router started (listening on port {})", self.config.network.p2p_port);
+
+        // 4. Derive topic from chain_id for deterministic swarm membership
+        let topic_id = topic_from_chain_id(&self.config.chain.chain_id);
+        info!("📢 Gossip Topic: {:?} (derived from chain_id '{}')", topic_id, self.config.chain.chain_id);
+
+        // 5. Resolve bootstrap peers (if any provided in config)
+        let mut bootstrap_peers = Vec::new();
         if let Some(boot_nodes) = &self.config.network.boot_nodes {
-            for node_addr in boot_nodes {
-                if let Ok(multiaddr) = node_addr.parse::<libp2p::Multiaddr>() {
-                    info!("🔗 Dialing bootnode at {}", multiaddr);
-                    if let Err(e) = swarm.dial(multiaddr.clone()) {
-                        error!("Failed to dial {}: {}", multiaddr, e);
+            for node_id_str in boot_nodes {
+                if node_id_str.is_empty() { continue; }
+                let parts: Vec<&str> = node_id_str.split('@').collect();
+                match parts[0].parse::<iroh::EndpointId>() {
+                    Ok(peer_node_id) => {
+                        info!("🔗 Adding bootstrap peer: {}", peer_node_id);
+                        if parts.len() > 1 {
+                            if let Ok(socket_addr) = parts[1].parse::<std::net::SocketAddr>() {
+                                let node_addr = iroh::EndpointAddr::new(peer_node_id).with_ip_addr(socket_addr);
+                                info!("🔗 Connecting directly to peer at {}...", socket_addr);
+                                let _ = endpoint.connect(node_addr, ALPN).await;
+                            }
+                        }
+                        bootstrap_peers.push(peer_node_id);
                     }
-                } else {
-                    tracing::warn!("⚠️ Invalid bootnode multiaddress format: {}", node_addr);
+                    Err(e) => {
+                        warn!("⚠️ Invalid boot_node NodeId '{}': {}", parts[0], e);
+                    }
                 }
             }
         }
 
-        // Setup communication channels
+        // 6. Subscribe to the gossip topic with bootstrap peers
+        let (gossip_sender, mut gossip_receiver) = gossip
+            .subscribe_and_join(topic_id, bootstrap_peers)
+            .await
+            .map_err(|e| format!("Failed to subscribe to gossip topic: {}", e))?
+            .split();
+
+        info!("✅ Joined gossip swarm for topic {:?}", topic_id);
+
+        // 7. Setup internal broadcast channel
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<P2PMessage>(100);
         self.command_tx = Some(cmd_tx);
 
         let bc_clone = self.blockchain.clone();
-        let _state_clone = self.state.clone();
         let peers_clone = self.active_peers.clone();
+        let allowed_peers = self.config.network.allowed_peers.clone();
 
-        // 5. The Main Event Loop (Runs in the background)
+        // 8. Main event loop (background task)
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    // Handle OUTBOUND broadcasts (from the Node to the Swarm)
+                    // OUTBOUND: Broadcast messages from the application to the gossip swarm
                     Some(msg) = cmd_rx.recv() => {
-                        let (topic, data) = match &msg {
-                            P2PMessage::NewLatticeBlock(_) => (Self::l1_topic(), serde_json::to_vec(&msg).unwrap()),
+                        match &msg {
+                            P2PMessage::NewLatticeBlock(_) => {
+                                let data = serde_json::to_vec(&msg).unwrap();
+                                if let Err(e) = gossip_sender.broadcast(data.into()).await {
+                                    debug!("Failed to broadcast gossip message: {:?}", e);
+                                }
+                            }
                             _ => continue,
-                        };
-                        
-                        if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
-                            debug!("Failed to publish message: {:?}", e);
                         }
                     }
 
-                    // Handle INCOMING events (from the Swarm to the Node)
-                    event = swarm.select_next_some() => match event {
-                        SwarmEvent::NewListenAddr { address, .. } => {
-                            info!("📡 Node is listening on {}", address);
-                        }
-                        
-                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                            info!("🔗 Connection established with peer ({:?}): {}", endpoint.get_remote_address(), peer_id);
-                            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                            let mut peers = peers_clone.write().await;
-                            if !peers.contains(&peer_id.to_string()) {
-                                peers.push(peer_id.to_string());
-                            }
-                        }
+                    // INBOUND: Receive messages from the gossip swarm
+                    event = gossip_receiver.next() => {
+                        match event {
+                            Some(Ok(event)) => {
+                                match event {
+                                    iroh_gossip::api::Event::Received(msg) => {
+                                        let from_id = msg.delivered_from.to_string();
 
-                        SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                            info!("🔌 Connection closed with peer: {}", peer_id);
-                            swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                            let mut peers = peers_clone.write().await;
-                            peers.retain(|p| p != &peer_id.to_string());
-                        }
+                                        // Whitelisting check
+                                        if let Some(ref allowed) = allowed_peers {
+                                            if !allowed.is_empty() && !allowed.contains(&from_id) {
+                                                warn!("🚫 Blocked message from unauthorized peer: {}", from_id);
+                                                continue;
+                                            }
+                                        }
 
-                        // mDNS discovered a new peer! Add them to the mesh.
-                        SwarmEvent::Behaviour(MvmBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                info!("🔗 Discovered new local peer via mDNS: {}", peer_id);
-                                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                                let mut peers = peers_clone.write().await;
-                                if !peers.contains(&peer_id.to_string()) {
-                                    peers.push(peer_id.to_string());
-                                }
-                            }
-                        }
-                        
-                        // mDNS lost a peer
-                        SwarmEvent::Behaviour(MvmBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                info!("🔌 Lost local mDNS peer: {}", peer_id);
-                                swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                                let mut peers = peers_clone.write().await;
-                                peers.retain(|p| p != &peer_id.to_string());
-                            }
-                        }
-
-                        // Gossipsub received a message from the mesh!
-                        SwarmEvent::Behaviour(MvmBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. })) => {
-                            if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&message.data) {
-                                match p2p_msg {
-                                    P2PMessage::NewLatticeBlock(block) => {
-                                        info!("📡 Gossiped Lattice Block received");
-                                        let mut bc = bc_clone.write().await;
-                                        bc.add_lattice_block(block);
+                                        if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&msg.content) {
+                                            match p2p_msg {
+                                                P2PMessage::NewLatticeBlock(block) => {
+                                                    info!("📡 Gossiped Lattice Block received from {}", from_id);
+                                                    let mut bc = bc_clone.write().await;
+                                                    bc.add_lattice_block(block);
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                    iroh_gossip::api::Event::NeighborUp(node_id) => {
+                                        let peer_str = node_id.to_string();
+                                        info!("🔗 Peer joined gossip mesh: {}", peer_str);
+                                        let mut peers = peers_clone.write().await;
+                                        if !peers.contains(&peer_str) {
+                                            peers.push(peer_str);
+                                        }
+                                    }
+                                    iroh_gossip::api::Event::NeighborDown(node_id) => {
+                                        let peer_str = node_id.to_string();
+                                        info!("🔌 Peer left gossip mesh: {}", peer_str);
+                                        let mut peers = peers_clone.write().await;
+                                        peers.retain(|p| p != &peer_str);
                                     }
                                     _ => {}
                                 }
                             }
+                            Some(Err(e)) => {
+                                error!("Gossip receive error: {:?}", e);
+                                break;
+                            }
+                            None => {
+                                warn!("Gossip stream ended");
+                                break;
+                            }
                         }
-                        _ => {}
                     }
                 }
             }
@@ -238,6 +234,6 @@ impl Network for MeshNetwork {
     }
 
     fn browser_count(&self) -> usize {
-        0 // WebRTC integration needed for browsers later
+        0
     }
 }
