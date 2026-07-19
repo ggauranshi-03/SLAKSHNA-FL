@@ -1,35 +1,60 @@
-# SLAKSHNA — Decentralized Geo-localised Personalized Federated Learning
+# SLAKSHNA — Decentralized Geo-Localised Personalized Federated Learning
 
-A **Peer-to-Peer Federated Learning Framework** enabled by blockchain built in Rust and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA** enables decentralized, privacy-preserving, trust-weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds. It runs on geo-localized machines distributed across different regions, sharing model updates without any central coordinator.
+A **Peer-to-Peer Federated Learning Framework** enabled by an asynchronous Layer-1 blockchain built in **Rust** and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA** enables decentralized, privacy-preserving, trust-weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds. It runs across geo-localized machines and institutional clusters (including SLURM GPU supercomputers) separated by complex firewalls, securely sharing compressed model updates without any central coordinator.
 
 ---
 
-## Key Features
+## 🌟 Key Features & Architectural Highlights
 
 - **Asynchronous Model-Lattice (Layer-1 Blockchain)**  
-  Instead of traditional synchronous FL rounds (`FedAvg`) that block waiting for slow participants, SLAKSHNA-FL operates as an asynchronous lattice. Nodes continuously train on local data, broadcast compressed model deltas inside `ModelProposal` blocks, and evaluate peers asynchronously.
-  
+  Instead of traditional synchronous FL rounds (`FedAvg`) that block waiting for slow participants, SLAKSHNA operates as an asynchronous DAG lattice. Nodes continuously train on local data, broadcast compressed model deltas inside `ModelProposal` blocks, and evaluate peers asynchronously.
+
+- **Iroh QUIC Mesh & Gossip Network (`iroh-gossip`)**  
+  Built on modern **Iroh v1.0.2**, the framework utilizes **QUIC** transport, direct NAT traversal (STUN/DERP), and `iroh-gossip` topic swarms (`iiitd/l1-blocks`). Nodes discover peers dynamically using cryptographic Ed25519 `NodeId` public keys.
+
+- **Universal Firewall & VPN Traversal (`Playit.gg`)**  
+  Academic and enterprise networks (such as IIITD campus firewalls or remote VPNs) often block inbound UDP/TCP hole-punching and standard DERP relay traffic. SLAKSHNA natively supports static public UDP/TCP tunneling via **Playit.gg**, providing fixed, persistent public addresses (`<ip>:<port>`) for nodes across different cities without requiring root/sudo access or complex router configurations.
+
 - **Bhaskera ML Engine (`ml_engine.py`)**  
-  A robust Python engine bridging the Rust blockchain with distributed GPU/CPU training. Powered by **Ray Train (`TorchTrainer`)**, **PyTorch**, and **HuggingFace PEFT (LoRA)**, it executes local fine-tuning on tokenized datasets with real-time epoch loss tracking.
+  A robust Python engine bridging the Rust blockchain with distributed GPU/CPU training. Powered by **Ray Train (`TorchTrainer`)**, **PyTorch**, and **HuggingFace PEFT (LoRA)**, it executes local fine-tuning on tokenized datasets while streaming real-time epoch loss tracking.
+
+- **SLURM Supercomputer & Multi-Core Cluster Support**  
+  Fully compatible with academic SLURM clusters (`srun` / `sbatch`). Because SLURM isolates allocated GPUs inside containers where the index is always `CUDA_VISIBLE_DEVICES=0`, SLAKSHNA's node configuration (`gpu_id`) seamlessly maps to cluster-assigned resources without port collisions or resource deadlocks.
 
 - **Reputation & Trust-Weighted Aggregation**  
   Peers asynchronously evaluate incoming model proposals (`LatticeBlockType::Evaluation`) by computing cosine similarity against their local gradient direction and tracking validation loss improvements. Nodes dynamically update peer trust scores (`state["alpha"]` and normalized `w_i` weights).
 
 - **Dynamic Committee Election & Poisoning Defense**  
-  On-chain evaluations are aggregated across the lattice (`Blockchain::get_elected_committee`). Top reputation nodes are elected to the validator committee, while malicious or poisoning nodes (e.g., nodes injecting destructive learning rates) are automatically filtered out.
+  On-chain evaluations are aggregated across the lattice (`Blockchain::get_elected_committee`). Top reputation nodes are elected to the validator committee, while malicious or poisoning nodes (e.g., nodes injecting destructive learning rates or random noise) are automatically filtered out and slashed.
 
-- **Top-K Sparsification (`SparseLoCo`) & Compression**  
-  Before broadcasting over the P2P network, local LoRA weight updates are sparsified to retain only the top 1% most significant weights (`sparsity=0.01`). The sparse tensors are half-precision encoded (`fp16`) and base64 compressed to minimize network bandwidth (`iiitd/l1-blocks` gossip topic).
+- **Top-K Sparsification (`SparseLoCo`) & Bandwidth Compression**  
+  Before broadcasting over the P2P network, local LoRA weight updates are sparsified to retain only the top 1% most significant weights (`sparsity=0.01`). The sparse tensors are half-precision encoded (`fp16`) and base64 compressed, slashing network bandwidth requirements by over 98%.
 
 - **Differential Privacy (DP)**  
-  Integrated with `opacus` (`PrivacyEngine`) and `opt-einsum` to ensure local gradients are cryptographically protected against membership inference and data reconstruction attacks.
-
-- **Libp2p Star & Mesh Networking**  
-  Built with Rust `libp2p` featuring TCP/QUIC transports, Noise encryption, Yamux multiplexing, Gossipsub message propagation, mDNS local discovery, and UPnP NAT traversal for over-the-internet deployment.
+  Integrated with `opacus` (`PrivacyEngine`) and `opt-einsum` to ensure local gradients are cryptographically protected against membership inference and model inversion attacks.
 
 ---
 
-## System Architecture
+## 🔒 Security & Privacy Architecture
+
+SLAKSHNA is built from the ground up to operate securely over untrusted public networks, proxies, and shared supercomputers:
+
+1. **End-to-End Cryptographic Transport (`TLS 1.3 over QUIC`)**  
+   Every node generates an `Ed25519` cryptographic keypair upon startup (`src/network/mesh.rs`). All communication across the Iroh mesh—whether sent directly via local IPs or routed across public internet tunnels like `Playit.gg`—is wrapped in end-to-end **TLS 1.3** encryption.
+   - **Zero-Trust Tunnels:** Public proxy services (`Playit.gg`) act purely as raw packet forwarders ("dumb pipes"). They cannot read, decrypt, or tamper with model weights or blockchain blocks because they do not hold the private keys.
+   
+2. **Cryptographic Block Signatures & Validation**  
+   Every `LatticeBlock` (`Proposal` or `Evaluation`) is hashed and cryptographically signed (`LatticeBlock::sign`) by the authoring node's Ed25519 private key. Receiving nodes strictly verify signatures (`LatticeBlock::verify`) before admitting blocks into the local RocksDB chain state.
+
+3. **Byzantine Fault Tolerant (BFT) Poisoning Defense**  
+   To prevent adversarial nodes from ruining the global model (`Model Poisoning`), SLAKSHNA does not use simple averaging. When a node receives a peer's delta, `ml_engine.py` evaluates the proposal against local validation metrics (`Cosine Similarity` & `Validation Loss`). If a node submits poisoned or erratic updates, its trust score (`alpha`) drops, rendering its weight in the Federated Averaging formula close to `0.0`.
+
+4. **Differential Privacy against Data Reconstruction**  
+   By combining `SparseLoCo` (sharing only 1% of fine-tuned LoRA weights) with `Opacus` gradient clipping and noise injection, raw local dataset samples (`ultrachat`, patient records, etc.) can never be reconstructed by eavesdroppers or peer nodes.
+
+---
+
+## 🏗️ System Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -38,24 +63,24 @@ A **Peer-to-Peer Federated Learning Framework** enabled by blockchain built in R
 ├──────────────────────────────────┬─────────────────────────────────────┤
 │         Rust L1 Engine           │           Python ML Engine          │
 │                                  │                                     │
-│  • LatticeBlock & Consensus      │  • ml_engine.py Bridge              │
+│  • Iroh Mesh & Gossip Consensus  │  • ml_engine.py Bridge              │
 │  • Committee Election (Trust)    │  • Bhaskera (Ray Train / PyTorch)   │
-│  • RocksDB State                 │  • LoRA Fine-Tuning & SparseLoCo    │
+│  • RocksDB State Persistence     │  • LoRA Fine-Tuning & SparseLoCo    │
 │  • Asynchronous Evaluation       │  • Opacus Differential Privacy      │
 ├──────────────────────────────────┴─────────────────────────────────────┤
-│               Libp2p Network (Gossipsub `iiitd/l1-blocks`)             │
-│                      (TCP / QUIC / mDNS / UPnP)                        │
+│            Iroh Network (`iroh-gossip` topic `iiitd/l1-blocks`)        │
+│          (QUIC / Ed25519 TLS 1.3 / mDNS / STUN / Playit.gg)            │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 | Layer | Technologies Used |
 | :--- | :--- |
 | **Core Blockchain** | **Rust** (`edition = 2021`), **Tokio** async runtime, **RocksDB** (`librocksdb-sys`) |
-| **P2P Networking** | **Libp2p** (`v0.53`), **QUIC** (`libp2p-quic`), **Gossipsub**, **Noise** cryptography, **mDNS**, **UPnP**, **bore** (tunneling) |
+| **P2P Networking** | **Iroh** (`iroh v1.0.2`, `iroh-gossip`, `iroh-relay`), **QUIC**, **Ed25519 TLS 1.3**, **Playit.gg** (Static Tunnels) |
 | **API & WebSockets** | **Axum 0.7**, **Hyper**, **tokio-tungstenite** (`WebSocket`), **Serde / Serde JSON** |
 | **ML Engine & FL** | **Python 3.11+**, **PyTorch**, **Ray / Ray Train** (`ray.train.torch.TorchTrainer`), **setproctitle** |
 | **Transformers & PEFT** | **HuggingFace Transformers**, **PEFT** (`LoRA`), **PyArrow** (Parquet caching), **PyYAML** |
@@ -63,36 +88,34 @@ A **Peer-to-Peer Federated Learning Framework** enabled by blockchain built in R
 
 ---
 
-## Repository Structure
+## 📂 Repository Structure
 
 | Path | Description |
 | :--- | :--- |
-| `src/main.rs` | Node entry point, environment setup, Phase A local training loop & lattice broadcast |
-| `src/chain.rs` | L1 `LatticeBlock` definitions (`ModelProposal`, `Evaluation`), trust scoring & committee election |
-| `src/state.rs` | RocksDB persistence layer (`State`, `StateSnapshot`) for lattice blocks and accounts |
-| `src/network/` | Libp2p network implementation (`star.rs`, `mesh.rs`, `mod.rs`) for P2P synchronization |
+| `src/main.rs` | Node entry point, phase execution, ML process orchestration (`spawn` streaming), and lattice broadcast |
+| `src/chain.rs` | L1 `LatticeBlock` definitions (`Proposal`, `Evaluation`), hash calculations, and committee election |
+| `src/state.rs` | RocksDB persistence layer (`State`, `StateSnapshot`) for lattice DAG blocks and accounts |
+| `src/network/` | Iroh QUIC + Gossip network implementation (`mesh.rs`, `mod.rs`, `star.rs`) for peer synchronization |
 | `src/api.rs` | Axum HTTP REST endpoints and real-time WebSocket broadcast server |
 | `src/config.rs` | TOML configuration loader for chain parameters, network ports, and storage paths |
-| `ml_engine.py` | Python bridge executing Bhaskera distributed LoRA training, sparsification, and evaluation |
-| `Bhaskera/` | Submodule / embedded repository containing the Bhaskera distributed LLM training launcher |
-| `setup.sh` | Automated setup script initializing Python venv, dependencies, and compiling the Rust binary |
-| `deploy.sh` | Automated Docker & Nginx deployment script for cloud VPS / DigitalOcean Droplets |
-| `config.toml` | Master node configuration file (ports `8545`/`9000`) |
-| `node2.toml` / `node3.toml` | Slave/peer node configuration files for multi-node simulation |
+| `ml_engine.py` | Python bridge executing Bhaskera distributed LoRA training, sparsification (`SparseLoCo`), and evaluation |
+| `Bhaskera/` | Submodule / embedded repository containing the Bhaskera distributed LLM training framework |
+| `config.toml` | Master/Node-1 configuration file |
+| `node2.toml` / `node3.toml` | Peer node configuration files |
 
 ---
 
-## Environment Setup (PATH & Variables)
+## ⚙️ Environment & Prerequisites Setup
 
-When setting up on a machine where Rust, Cargo, or Python are installed in non-standard directories (such as `/mnt/disk1/...`), configure your environment variables first before running or compiling:
+When setting up on a machine where Rust, Cargo, or Python are installed in custom directories (such as `/mnt/disk1/...` or scratch drives), export your environment variables before compiling or running:
 
 ```bash
-# 1. Point to correct Rust & Cargo paths
+# 1. Point to your Rust & Cargo installation
 export CARGO_HOME=/mnt/disk1/slakshna/rust/.cargo
 export RUSTUP_HOME=/mnt/disk1/slakshna/rust/.rustup
 export PATH=$CARGO_HOME/bin:$PATH
 
-# 2. Activate Python Environment (Bhaskera or local .venv)
+# 2. Activate Python Environment
 if [ -f "/mnt/disk1/slakshna/Bhaskera/bhaskera-activate.sh" ]; then
     source /mnt/disk1/slakshna/Bhaskera/bhaskera-activate.sh
 elif [ -f ".venv/bin/activate" ]; then
@@ -100,78 +123,49 @@ elif [ -f ".venv/bin/activate" ]; then
 fi
 ```
 
-To make these environment exports permanent, append them to your `~/.bashrc` or `~/.profile`.
-
----
-
-## Quick Start & Setup
-
-### 1. Automated Setup (`setup.sh`)
-The easiest way to prepare Python dependencies and build the Rust L1 binary:
-
-```bash
-chmod +x setup.sh
-./setup.sh
-```
-
-### 2. Manual Setup
-After setting up your environment variables (above), compile the Rust node:
+### Installation & Build
 
 ```bash
 # Upgrade pip and install core ML/FL dependencies
 pip install --upgrade pip
-pip install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml setproctitle
+pip install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml setproctitle toml
 
-# Build the Rust Layer-1 engine in release mode
+# Build the Rust Layer-1 node binary in release mode
 cargo build --release
 ```
 
 ---
 
-## TOML Configuration Breakdown
+## 🔧 TOML Configuration Breakdown
 
-Every node requires a `.toml` configuration file (`config.toml`, `node2.toml`, `node3.toml`). 
+Every node requires its own `.toml` configuration file (`config.toml`, `node2.toml`, etc.).
 
 ### Master Node (`config.toml`)
-The bootstrap / master node typically runs on default ports and binds to GPU 0:
 ```toml
 [node]
 id = "node-1"
 type = "master"
-data_dir = "./data-node1"   # Dedicated RocksDB storage directory
+data_dir = "./data-node1"   # Dedicated RocksDB and delta storage directory
 gpu_id = 0                  # GPU assigned to this node for local training
 
 [network]
 topology = "mesh"
 host = "0.0.0.0"
-p2p_port = 9000             # Master P2P listening port
-api_port = 8545             # Master REST API port
-ws_port = 8546              # Master WebSocket port
-boot_nodes = []             # Master has no boot nodes
-
-[network.star]
-master_url = ""             # Empty for master node
+p2p_port = 9000             # Iroh QUIC router listening port
+api_port = 8545             # Axum HTTP REST API port
+ws_port = 8546              # WebSocket port
+boot_nodes = []             # Master has no initial boot nodes
 ```
 
-### Peer Nodes (`node2.toml` & `node3.toml`)
-When running additional nodes, **each node must have a unique `data_dir`, `gpu_id`, and unique ports** (`api_port`, `ws_port`, `p2p_port`) to prevent address binding conflicts and RocksDB lock errors. Additionally, peer nodes specify the master node via `boot_nodes` and `master_url`:
+### Remote Peer Node (`node2.toml` / `node3.toml`)
+When connecting a remote node over the internet or across campuses, point `boot_nodes` directly to the Master Node's **Ed25519 `NodeId`** (printed by the master node upon startup) or its public static tunnel (`Playit.gg`):
 
 ```toml
-# Example for Node 2 (node2.toml)
 [node]
 id = "node-2"
 type = "full"
-data_dir = "./data-node2"   # MUST be unique (e.g., ./data-node2, ./data-node3)
-gpu_id = 1                  # Assign distinct GPU (e.g., 1, 2)
-
-[network]
-topology = "mesh"
-host = "0.0.0.0"
-p2p_port = 9001             # Unique P2P port per node (9001, 9002...)
-api_port = 8555             # Unique API port per node (8555, 8565...)
-ws_port = 8547              # Unique WS port per node
-data_dir = "./data-node2"   
-gpu_id = 1                  
+data_dir = "./data-node2"   # MUST be unique per node
+gpu_id = 0                  # Set to 0 if running inside SLURM (--gres=gpu:1), or 1 if multi-GPU server
 
 [network]
 topology = "mesh"
@@ -180,122 +174,68 @@ p2p_port = 9001
 api_port = 8555             
 ws_port = 8547              
 
-# Point boot_nodes to the Master Node's Iroh ID:
-boot_nodes = ["<MASTER_NODE_ID>"]
+# Point boot_nodes to the Master Node's Iroh PublicKey (NodeId):
+# Iroh automatically discovers the route via direct IP, mDNS, STUN, or public Playit tunnel
+boot_nodes = ["<MASTER_IROH_PUBLIC_KEY>"]
 ```
 
 ---
 
-## Running the System Locally
+## 🚀 Running the System across Geo-Localized Machines
 
-### Standalone Master Node
+### Step 1: Start the Master Node (e.g., Delhi Machine / Main Server)
 ```bash
 ./target/release/iiitd --config config.toml
 ```
-
-### Multi-Node Local Lattice Simulation
-Open separate terminal windows on your machine, activate your environment, and start each node:
-
-```bash
-# Terminal 1 — Master / Bootstrap Node
-./target/release/iiitd --config config.toml
-
-# Terminal 2 — Peer Node 2
-./target/release/iiitd --config node2.toml
-
-# Terminal 3 — Peer Node 3
-./target/release/iiitd --config node3.toml
+When started, the node will output its unique Iroh `NodeId` and address:
 ```
+INFO 🔑 Iroh NodeId: a65a49db0894467a3b6d95eda3924c309a5589e265f734332f2b65100364be90
+🎟️ USE THIS NODE_ID AS BOOT_NODE ON OTHER MACHINES: a65a49db0894467a3b6d95eda3924c309a5589e265f734332f2b65100364be90
+```
+
+### Step 2: Running Behind Firewalls using Playit.gg Tunnels
+If your university or corporate firewall blocks direct inbound/outbound QUIC traffic between cities (e.g., Delhi $\leftrightarrow$ Mumbai):
+1. Install and run **playit.gg** on the machine with strict firewalls (`~/playit`).
+2. Create a static public UDP/TCP tunnel pointing to local port `9001` (or whatever `p2p_port` your node uses).
+3. Because Iroh encrypts all traffic using the Ed25519 NodeId (`boot_nodes = ["<MASTER_ID>"]`), peers seamlessly discover and communicate through the `playit` tunnel with zero security compromises.
 
 ---
 
-### Step 2: Configure Remote Peer Nodes Over the Internet
-On the remote machine hosting Node 2 or Node 3, edit your `.toml` configuration file (`node2.toml`) to use the public `bore.pub` addresses:
+## 🖥️ Running on Academic SLURM Supercomputers (`login09` / `ldls-iiitd`)
 
-```toml
-[network]
-# Point boot_nodes to the bore tunnel for port 9000 (/dns4/<domain>/tcp/<assigned_port>):
-boot_nodes = ["/dns4/bore.pub/tcp/34812"]
-
-[network.star]
-# Point master_url to the bore tunnel for port 8545 (http://<domain>:<assigned_port>):
-master_url = "http://bore.pub:41205"
-```
-
-Then start the remote peer node normally:
-```bash
-./target/release/iiitd --config node2.toml
-```
-The remote node will connect over the internet directly into your master node's P2P lattice!
+When deploying SLAKSHNA on a SLURM cluster login node (`login09`):
+1. **Never run directly on the login node without a GPU allocation**, as `torch.cuda.is_available()` will fail (`no GPUs found!`).
+2. **Set `gpu_id = 0` in your `.toml` file.** When SLURM allocates a physical GPU (`rpgpu[...]`) to your job, it maps that card inside the container to `CUDA_VISIBLE_DEVICES=0`.
+3. **Launch the node using `srun` on the GPU partition:**
+   ```bash
+   srun -p gpu --gres=gpu:1 --time=04:00:00 ./target/release/iiitd --config config.toml
+   ```
 
 ---
 
-## HTTP REST & WebSocket API
+## 🌐 HTTP REST & WebSocket API
 
 The node exposes an Axum-powered API for monitoring lattice blocks, trust evaluations, and system status:
 
-### General & Node Status
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` | Basic node info & API welcome |
-| `GET` | `/status` | Returns chain height, active P2P peer count, browser websocket connections, and node type |
-
-### Lattice Block Queries
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/block/:height` | Query L1 Lattice Block status (or not implemented note if L2 queried) |
-| `GET` | `/block/latest` | Query latest L1 status |
-| `GET` | `/blocks?limit=N` | Returns list of recent lattice blocks |
-
-### Reputation & Rankings
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/leaderboard` | Returns active account / node reputation rankings |
-
-### Real-Time WebSockets
-| Endpoint | Description |
-| :--- | :--- |
-| `ws://localhost:8545/ws` | Live WebSocket subscription emitting new blocks, node status events, and peer updates |
+| `GET` | `/status` | Returns chain height, active Iroh P2P peer count, and node status |
+| `GET` | `/blocks?limit=N` | Returns list of recent `Proposal` and `Evaluation` blocks |
+| `GET` | `/block/latest` | Query latest L1 consensus status |
+| `GET` | `/leaderboard` | Returns active node reputation and trust score rankings (`alpha` / `w_i`) |
+| `WS` | `ws://localhost:8546/ws` | Live WebSocket stream emitting new blocks and peer evaluation updates |
 
 ---
 
-## Production Deployment (`deploy.sh`)
+## 🧪 Testing Model Poisoning & Defense
 
-To deploy the node to a cloud VPS (e.g., DigitalOcean Droplet, AWS EC2) with Docker, Nginx, and automated Let's Encrypt SSL:
-
-```bash
-# Run on the cloud server as root
-chmod +x deploy.sh
-./deploy.sh
-```
-
-### Useful Docker Commands:
-```bash
-# Check running containers
-docker compose ps
-
-# View live backend logs
-docker compose logs -f backend
-
-# Restart services without rebuilding
-docker compose restart backend
-
-# Full clean rebuild
-docker compose up -d --build --force-recreate
-```
-
----
-
-## Security & Malicious Node Testing
-
-SLAKSHNA-FL includes built-in defense testing against model poisoning attacks. You can designate specific nodes as malicious via environment variables:
+You can simulate a malicious node attempting to poison the Federated Learning consensus by setting the `MALICIOUS_NODES` environment variable:
 
 ```bash
-# Run Node 2 as a malicious poisoning node (injects destructive learning rates)
 MALICIOUS_NODES="node-2" ./target/release/iiitd --config node2.toml
 ```
 
-During training, honest nodes (`node-1`, `node-3`) will evaluate `node-2`'s proposal via cosine similarity in `ml_engine.py`, observe a drop in alignment, slash its `state["alpha"]` trust score, and exclude `node-2` from the elected validator committee (`get_elected_committee`).
+When `node-2` runs in malicious mode, it injects a destructive learning rate (`learning_rate = 1.0`). When `node-1` receives `node-2`'s proposal, `ml_engine.py` computes cosine similarity and observes negative alignment. `node-1` automatically slashes `node-2`'s trust score and excludes it from the validator committee (`get_elected_committee`).
 
 ---
 
