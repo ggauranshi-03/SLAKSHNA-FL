@@ -134,11 +134,10 @@ def prepare_bhaskera_config(my_id, is_malicious):
     os.makedirs(node_data_dir, exist_ok=True)
     os.makedirs(node_ckpt_dir, exist_ok=True)
 
-    import shutil
     if os.path.exists(node_cache_dir):
-        print(f"[{my_id}] Clearing stale tokenized cache to ensure fresh dataset parse...", file=sys.stderr)
-        shutil.rmtree(node_cache_dir)
-        
+        # We NO LONGER delete the cache, so it doesn't re-tokenize on every epoch!
+        print(f"[{my_id}] Found existing tokenized cache, skipping re-tokenization!", file=sys.stderr)
+
     # os.makedirs(node_data_dir, exist_ok=True)
     # os.makedirs(node_ckpt_dir, exist_ok=True)
     os.makedirs(node_cache_dir, exist_ok=True)
@@ -401,7 +400,6 @@ def main():
         print(f"[{my_id}] Starting private Ray cluster...", file=sys.stderr)
         context = ray.init(
             dashboard_port=dash_port,
-            num_cpus=max(1, os.cpu_count() // 4) if os.cpu_count() else 16,
             num_gpus=1,
             include_dashboard=False,
             ignore_reinit_error=True
