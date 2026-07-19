@@ -4,7 +4,7 @@ A **Peer-to-Peer Federated Learning Framework** enabled by an asynchronous Layer
 
 ---
 
-## 🌟 Key Features & Architectural Highlights
+## Key Features & Architectural Highlights
 
 - **Asynchronous Model-Lattice (Layer-1 Blockchain)**  
   Instead of traditional synchronous FL rounds (`FedAvg`) that block waiting for slow participants, SLAKSHNA operates as an asynchronous DAG lattice. Nodes continuously train on local data, broadcast compressed model deltas inside `ModelProposal` blocks, and evaluate peers asynchronously.
@@ -35,7 +35,7 @@ A **Peer-to-Peer Federated Learning Framework** enabled by an asynchronous Layer
 
 ---
 
-## 🔒 Security & Privacy Architecture
+## Security & Privacy Architecture
 
 SLAKSHNA is built from the ground up to operate securely over untrusted public networks, proxies, and shared supercomputers:
 
@@ -54,7 +54,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -75,7 +75,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technologies Used |
 | :--- | :--- |
@@ -88,7 +88,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 | Path | Description |
 | :--- | :--- |
@@ -105,7 +105,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 
 ---
 
-## ⚙️ Environment & Prerequisites Setup
+## Environment & Prerequisites Setup
 
 When setting up on a machine where Rust, Cargo, or Python are installed in custom directories (such as `/mnt/disk1/...` or scratch drives), export your environment variables before compiling or running:
 
@@ -136,7 +136,7 @@ cargo build --release
 
 ---
 
-## 🔧 TOML Configuration Breakdown
+## TOML Configuration Breakdown
 
 Every node requires its own `.toml` configuration file (`config.toml`, `node2.toml`, etc.).
 
@@ -176,12 +176,12 @@ ws_port = 8547
 
 # Point boot_nodes to the Master Node's Iroh PublicKey (NodeId):
 # Iroh automatically discovers the route via direct IP, mDNS, STUN, or public Playit tunnel
-boot_nodes = ["<MASTER_IROH_PUBLIC_KEY>"]
+boot_nodes = ["<MASTER_IROH_PUBLIC_KEY>@<tunnel address>"]
 ```
 
 ---
 
-## 🚀 Running the System across Geo-Localized Machines
+## Running the System across Geo-Localized Machines
 
 ### Step 1: Start the Master Node (e.g., Delhi Machine / Main Server)
 ```bash
@@ -201,9 +201,9 @@ If your university or corporate firewall blocks direct inbound/outbound QUIC tra
 
 ---
 
-## 🖥️ Running on Academic SLURM Supercomputers (`login09` / `ldls-iiitd`)
+## Running on Academic SLURM Supercomputers
 
-When deploying SLAKSHNA on a SLURM cluster login node (`login09`):
+When deploying SLAKSHNA on a SLURM cluster login node:
 1. **Never run directly on the login node without a GPU allocation**, as `torch.cuda.is_available()` will fail (`no GPUs found!`).
 2. **Set `gpu_id = 0` in your `.toml` file.** When SLURM allocates a physical GPU (`rpgpu[...]`) to your job, it maps that card inside the container to `CUDA_VISIBLE_DEVICES=0`.
 3. **Launch the node using `srun` on the GPU partition:**
@@ -213,7 +213,7 @@ When deploying SLAKSHNA on a SLURM cluster login node (`login09`):
 
 ---
 
-## 🌐 HTTP REST & WebSocket API
+## HTTP REST & WebSocket API
 
 The node exposes an Axum-powered API for monitoring lattice blocks, trust evaluations, and system status:
 
@@ -227,7 +227,7 @@ The node exposes an Axum-powered API for monitoring lattice blocks, trust evalua
 
 ---
 
-## 🧪 Testing Model Poisoning & Defense
+## Testing Model Poisoning & Defense
 
 You can simulate a malicious node attempting to poison the Federated Learning consensus by setting the `MALICIOUS_NODES` environment variable:
 
