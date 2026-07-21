@@ -124,7 +124,7 @@ def log_ml_performance(node_id, current_round, loss_before, loss_after, accuracy
         )
 
 
-def prepare_bhaskera_config(my_id, is_malicious):
+def prepare_bhaskera_config(my_id, is_malicious, training_mode="finetuning"):
     with open(os.path.join(BASE_DIR, "node_template.yaml"), "r") as f:
         config = yaml.safe_load(f)
 
@@ -181,6 +181,24 @@ def prepare_bhaskera_config(my_id, is_malicious):
     if is_malicious:
         # Poisoning the model with huge LR
         config["training"]["learning_rate"] = 1.0
+
+    if training_mode == "pretraining":
+        config.setdefault("lora", {})["enabled"] = False
+        config.setdefault("plugins", {})["optimizers"] = ["bhaskera.plugins.optimizers.galore"]
+        config.setdefault("training", {})["optimizer"] = {
+            "backend": "plugin",
+            "name": "galore",
+            "kwargs": {
+                "rank": 128,
+                "update_proj_gap": 200,
+                "scale": 0.25,
+                "proj_type": "std"
+            }
+        }
+        # Point to local directory containing the aggregated base model
+        local_model_dir = os.path.join(MODEL_DIR, f"{my_id}_base_full")
+        if os.path.exists(local_model_dir):
+            config.setdefault("model", {})["name"] = local_model_dir
 
     config_path = os.path.join(BASE_DIR, f"config_{my_id}.yaml")
     with open(config_path, "w") as f:
@@ -289,6 +307,24 @@ def main():
     all_nodes = sorted([my_id] + neighbors)
 
     device = get_device(my_id)
+    
+    TRAINING_MODE = os.environ.get("TRAINING_MODE", "finetuning")
+    
+    if TRAINING_MODE == "pretraining":
+        local_model_dir = os.path.join(MODEL_DIR, f"{my_id}_base_full")
+        if not os.path.exists(local_model_dir):
+            print(f"[{my_id}] Base model not found locally. Downloading from HuggingFace to {local_model_dir}...", file=sys.stderr)
+            with open(os.path.join(BASE_DIR, "node_template.yaml"), "r") as f:
+                template_config = yaml.safe_load(f)
+            hf_model_name = template_config.get("model", {}).get("name", "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T")
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            model_tmp = AutoModelForCausalLM.from_pretrained(hf_model_name, torch_dtype=torch.bfloat16)
+            tokenizer_tmp = AutoTokenizer.from_pretrained(hf_model_name)
+            model_tmp.save_pretrained(local_model_dir)
+            tokenizer_tmp.save_pretrained(local_model_dir)
+            del model_tmp
+            import gc
+            gc.collect()
 
     log_runtime(
     my_id,
@@ -304,7 +340,7 @@ def main():
     )
     is_malicious = my_id in malicious_nodes
 
-    my_model_path = os.path.join(MODEL_DIR, f"{my_id}_base_lora.pth")
+    my_model_path = os.path.join(MODEL_DIR, f"{my_id}_base_{'lora' if TRAINING_MODE == 'finetuning' else 'full'}.pth")
     my_delta_path = os.path.join(MODEL_DIR, f"{my_id}_delta.pth")
     my_state_path = os.path.join(STATE_DIR, f"{my_id}_state.json")
 
@@ -333,7 +369,7 @@ def main():
     log_trust_scores(my_id, w_i)
 
     # 1. Bhaskera config preparation
-    config_path, tokenized_path, ckpt_dir = prepare_bhaskera_config(my_id, is_malicious)
+    config_path, tokenized_path, ckpt_dir = prepare_bhaskera_config(my_id, is_malicious, TRAINING_MODE)
 
     try:
         # 2. Tokenize dataset once if not present
@@ -495,17 +531,60 @@ def main():
         latest_step_dir = str(step_dirs[-1])
         model_sd = {}
         _dcp_load({"model": model_sd}, os.path.join(latest_step_dir, "model"))
-        delta_i = {k: v.to(device) for k, v in model_sd.items() if "lora_" in k}
+        
+        if TRAINING_MODE == "finetuning":
+            delta_i = {k: v.to(device) for k, v in model_sd.items() if "lora_" in k}
+        else:
+            # Pretraining (GaLore): Compute full-parameter difference
+            local_model_dir = os.path.join(MODEL_DIR, f"{my_id}_base_full")
+            from safetensors.torch import load_file
+            import glob
+            base_model_sd = {}
+            sf_files = glob.glob(os.path.join(local_model_dir, "*.safetensors"))
+            if sf_files:
+                for sf in sf_files:
+                    base_model_sd.update(load_file(sf))
+            else:
+                bin_files = glob.glob(os.path.join(local_model_dir, "*.bin"))
+                for bin_file in bin_files:
+                    base_model_sd.update(torch.load(bin_file, map_location="cpu", weights_only=True))
+            
+            delta_i = {}
+            for k, v in model_sd.items():
+                if k in base_model_sd:
+                    # delta = new - old
+                    delta_i[k] = v.to(device) - base_model_sd[k].to(device)
     else:
         adapter_path = get_adapter_path(ckpt_dir)
         if adapter_path:
             if adapter_path.endswith(".safetensors"):
                 import safetensors.torch
 
-                delta_i = safetensors.torch.load_file(adapter_path)
-                delta_i = {k: v.to(device) for k, v in delta_i.items()}
+                sd = safetensors.torch.load_file(adapter_path)
+                sd = {k: v.to(device) for k, v in sd.items()}
             else:
-                delta_i = torch.load(adapter_path, map_location=device, weights_only=True)
+                sd = torch.load(adapter_path, map_location=device, weights_only=True)
+                
+            if TRAINING_MODE == "finetuning":
+                delta_i = sd
+            else:
+                local_model_dir = os.path.join(MODEL_DIR, f"{my_id}_base_full")
+                from safetensors.torch import load_file
+                import glob
+                base_model_sd = {}
+                sf_files = glob.glob(os.path.join(local_model_dir, "*.safetensors"))
+                if sf_files:
+                    for sf in sf_files:
+                        base_model_sd.update(load_file(sf))
+                else:
+                    bin_files = glob.glob(os.path.join(local_model_dir, "*.bin"))
+                    for bin_file in bin_files:
+                        base_model_sd.update(torch.load(bin_file, map_location="cpu", weights_only=True))
+                
+                delta_i = {}
+                for k, v in sd.items():
+                    if k in base_model_sd:
+                        delta_i[k] = v.to(device) - base_model_sd[k].to(device)
         else:
             delta_i = {"dummy": torch.zeros(1, device=device)}
 
@@ -602,8 +681,26 @@ def main():
             ):  # Safety check
                 delta_agg[k] += weight * d_j[k]
 
-    # Save aggregated LoRA as base for next epoch
-    torch.save({k: v.cpu() for k, v in delta_agg.items()}, my_model_path)
+    # Save aggregated LoRA as base for next epoch OR apply full-model updates
+    if TRAINING_MODE == "finetuning":
+        my_model_path = os.path.join(MODEL_DIR, f"{my_id}_base_lora.pth")
+        torch.save({k: v.cpu() for k, v in delta_agg.items()}, my_model_path)
+    else:
+        # Pretraining: Apply delta to base model and save
+        local_model_dir = os.path.join(MODEL_DIR, f"{my_id}_base_full")
+        from transformers import AutoModelForCausalLM
+        print(f"[{my_id}] Applying full-parameter aggregated updates to base model...", file=sys.stderr)
+        model_tmp = AutoModelForCausalLM.from_pretrained(local_model_dir, torch_dtype=torch.bfloat16)
+        sd = model_tmp.state_dict()
+        for k, update in delta_agg.items():
+            if k in sd:
+                # Apply delta: base = base + delta
+                sd[k] += update.cpu().to(sd[k].dtype)
+        model_tmp.load_state_dict(sd)
+        model_tmp.save_pretrained(local_model_dir)
+        del model_tmp
+        import gc
+        gc.collect()
 
     # Evaluate improvement (Cosine Similarity Peer Evaluation)
     accuracy_percentage = (
