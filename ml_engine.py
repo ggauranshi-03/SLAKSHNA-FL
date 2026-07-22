@@ -148,7 +148,7 @@ def prepare_bhaskera_config(my_id, is_malicious, training_mode="finetuning"):
     config["data"]["cache_dir"] = node_cache_dir  # Required by Bhaskera tokenizer
     
     # Force training dataset to be exactly 80 rows so 1 epoch naturally finishes in 10 steps!
-    config["data"]["max_train_samples"] = 80
+    config["data"]["max_train_samples"] = 800
     
     # Aggressively override all possible checkpoint keys to prevent nodes from colliding in a hardcoded directory
     if "checkpoint" not in config: config["checkpoint"] = {}
@@ -165,7 +165,7 @@ def prepare_bhaskera_config(my_id, is_malicious, training_mode="finetuning"):
     # Force it to save by steps instead of waiting for an epoch.
     # We must allow the epoch to naturally finish to trigger the hardcoded save.
     # Set max_steps higher than 10 so it doesn't artificially terminate early.
-    config["training"]["max_steps"] = 15
+    config["training"]["max_steps"] = 50
     config["training"]["save_strategy"] = "steps"
     config["training"]["save_steps"] = 5
     config["training"]["save_total_limit"] = 1
@@ -334,7 +334,7 @@ def main():
     neighbors="|".join(neighbors),
     )
 
-    env_malicious = os.environ.get("MALICIOUS_NODES", "node-2")
+    env_malicious = os.environ.get("MALICIOUS_NODES", "")
     malicious_nodes = (
         [x.strip() for x in env_malicious.split(",")] if env_malicious.strip() else []
     )
