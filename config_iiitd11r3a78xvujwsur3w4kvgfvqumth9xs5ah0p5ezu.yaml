@@ -9,7 +9,7 @@ data:
   cache_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11r3a78xvujwsur3w4kvgfvqumth9xs5ah0p5ezu/tokenized_cache
   dataset_name: timdettmers/openassistant-guanaco
   format_renderer: chatml
-  max_train_samples: 80
+  max_train_samples: 800
   sequence_length: 512
   tokenized_path: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11r3a78xvujwsur3w4kvgfvqumth9xs5ah0p5ezu/tokenized_cache/ultrachat_b1331b3f65d80c47
 logging:
@@ -37,7 +37,7 @@ training:
     strategy: ddp
   gradient_accumulation_steps: 2
   learning_rate: 2e-4
-  max_steps: 15
+  max_steps: 50
   output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11r3a78xvujwsur3w4kvgfvqumth9xs5ah0p5ezu
   save_steps: 5
   save_strategy: steps

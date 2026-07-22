@@ -42,7 +42,7 @@ host = "0.0.0.0"
 p2p_port = 9002
 ws_port = 8548
 api_port = 8556
-boot_nodes = ["9c71ef0454bab5ffb25de8d9c2e649413171887c01770aa7df89f01410627a22@127.0.0.1:9000"]
+boot_nodes = ["b24da6abf4fdb4117bae919070b55ef2758c959cb63a091299a7228b7f8d0a38@127.0.0.1:9000"]
 
 [network.star]
 master_url = "http://192.168.22.23:8545"
