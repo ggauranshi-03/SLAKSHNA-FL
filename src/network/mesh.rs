@@ -407,6 +407,9 @@ impl Network for MeshNetwork {
                         match &msg {
                             P2PMessage::NewLatticeBlock(_) => {
                                 let data = serde_json::to_vec(&msg).unwrap();
+                                let size_bytes = data.len();
+                                let size_mb = size_bytes as f64 / 1_048_576.0;
+                                info!("📤 Broadcasting Lattice Block to Swarm | Network Payload Size: {} bytes ({:.2} MB)", size_bytes, size_mb);
                                 if let Err(e) = gossip_sender.broadcast(data.into()).await {
                                     debug!("Failed to broadcast gossip message: {:?}", e);
                                 }
@@ -430,6 +433,9 @@ impl Network for MeshNetwork {
                                                 continue;
                                             }
                                         }
+                                        let size_bytes = msg.content.len();
+                                        let size_mb = size_bytes as f64 / 1_048_576.0;
+                                        info!("📡 Gossiped Lattice Block received from {} | Network Payload Size: {} bytes ({:.2} MB)", from_id, size_bytes, size_mb);
 
                                         if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&msg.content) {
                                             match p2p_msg {
