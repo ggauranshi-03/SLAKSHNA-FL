@@ -183,21 +183,46 @@ boot_nodes = ["<MASTER_IROH_PUBLIC_KEY>@<tunnel address>"]
 
 ## Running the System across Geo-Localized Machines
 
-### Step 1: Start the Master Node (e.g., Delhi Machine / Main Server)
+If your machines are located in different cities (e.g., Delhi $\leftrightarrow$ Mumbai) and are separated by strict university or corporate firewalls (NAT/Deep Packet Inspection) that block peer-to-peer discovery, you must use a reverse proxy tunnel.
+
+**What is Playit.gg?**  
+[Playit.gg](https://playit.gg) is a service that creates a secure outbound tunnel from your local machine to a public cloud server. It gives your local node a static public IP address on the internet, completely bypassing incoming firewall restrictions. Because SLAKSHNA uses Iroh (End-to-End Encryption), passing data through Playit's public servers is 100% secure.
+
+### Step 1: Start the Playit Tunnel (Main Machine)
+*You must run this on your "Main Machine" (e.g., Delhi server) **before** starting the SLAKSHNA node.*
+
+1. Install `playit` on the main machine.
+2. Start the Playit daemon (e.g., `cd ~/playit && ./playit start`).
+3. Follow the CLI prompt to create a tunnel. Create a **UDP/TCP tunnel** pointing to your local Iroh `p2p_port` (e.g., `9000` or `9001` based on your config).
+4. Playit will assign you a public endpoint. **Note down this IP and Port** (e.g., `147.185.221.225:42060`).
+
+### Step 2: Start the Master Node (Main Machine)
+With the tunnel running in the background, start your node:
 ```bash
 ./target/release/iiitd --config config.toml
 ```
-When started, the node will output its unique Iroh `NodeId` and address:
+When started, the node will output its unique cryptographic Iroh `NodeId` (Public Key):
 ```
 INFO 🔑 Iroh NodeId: a65a49db0894467a3b6d95eda3924c309a5589e265f734332f2b65100364be90
-🎟️ USE THIS NODE_ID AS BOOT_NODE ON OTHER MACHINES: a65a49db0894467a3b6d95eda3924c309a5589e265f734332f2b65100364be90
 ```
 
-### Step 2: Running Behind Firewalls using Playit.gg Tunnels
-If your university or corporate firewall blocks direct inbound/outbound QUIC traffic between cities (e.g., Delhi $\leftrightarrow$ Mumbai):
-1. Install and run **playit.gg** on the machine with strict firewalls (`~/playit`).
-2. Create a static public UDP/TCP tunnel pointing to local port `9001` (or whatever `p2p_port` your node uses).
-3. Because Iroh encrypts all traffic using the Ed25519 NodeId (`boot_nodes = ["<MASTER_ID>"]`), peers seamlessly discover and communicate through the `playit` tunnel with zero security compromises.
+### Step 3: Connect Peer Nodes (e.g., Mumbai Machine)
+On your secondary machines, open their TOML configuration file (e.g., `node2.toml`).
+
+You need to tell this machine exactly how to reach the Main Machine. Combine the **NodeId** (from Step 2) and the **Playit Public IP:Port** (from Step 1) using the format `<node_id>@<playit_ip>:<playit_port>`.
+
+Update the `boot_nodes` field:
+```toml
+[network]
+# Format: ["<NodeId>@<Playit_IP>:<Playit_Port>"]
+boot_nodes = ["a65a49db0894467a3b6d95eda3924c309a5589e265f734332f2b65100364be90@147.185.221.225:42060"]
+```
+
+Now, start the peer node:
+```bash
+./target/release/iiitd --config node2.toml
+```
+The peer node will dial the public Playit IP, encrypt the traffic using the NodeId, and establish a direct connection to the main machine!
 
 ---
 
