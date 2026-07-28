@@ -1,3 +1,6 @@
+plugins:
+  optimizers: []
+
 model:
   name: "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
   dtype: "bfloat16"
@@ -21,8 +24,10 @@ lora:
 training:
   batch_size: 4
   gradient_accumulation_steps: 2
-  learning_rate: 2e-4
+  learning_rate: 2e-3
   max_steps: 10
+  optimizer:
+    backend: "default"
   distributed:
     strategy: "ddp"
 

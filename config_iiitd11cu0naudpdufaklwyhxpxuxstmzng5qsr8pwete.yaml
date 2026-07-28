@@ -1,0 +1,58 @@
+checkpoint:
+  checkpoint_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete
+  enabled: true
+  retention: 1
+  save_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete
+  save_directory: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete
+  save_interval: 1
+data:
+  cache_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete/tokenized_cache
+  dataset_name: timdettmers/openassistant-guanaco
+  format_renderer: chatml
+  max_train_samples: 10000
+  sequence_length: 512
+  tokenized_path: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete/tokenized_cache/ultrachat_b1331b3f65d80c47
+logging:
+  tracker: none
+lora:
+  alpha: 16
+  dropout: 0.05
+  enabled: true
+  rank: 8
+  resume_path: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete_base_lora.pth
+  target_modules:
+  - q_proj
+  - v_proj
+model:
+  dtype: bfloat16
+  name: TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T
+  trust_remote_code: true
+  use_liger_kernel: false
+monitoring:
+  dashboard_port: 8947
+  metrics_export_port: 9947
+output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete
+plugins:
+  optimizers:
+  - bhaskera.plugins.optimizers.galore
+training:
+  batch_size: 4
+  distributed:
+    strategy: ddp
+  gradient_accumulation_steps: 2
+  learning_rate: 2e-3
+  lr: 2e-3
+  max_steps: 50
+  optimizer:
+    backend: plugin
+    kwargs:
+      proj_type: std
+      rank: 128
+      scale: 0.25
+      update_proj_gap: 200
+    name: galore
+  output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11cu0naudpdufaklwyhxpxuxstmzng5qsr8pwete
+  save_steps: 5
+  save_strategy: steps
+  save_total_limit: 1
+  warmup_steps: 0

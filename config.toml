@@ -35,7 +35,7 @@ id = "1"
 type = "master"
 data_dir = "./data-node1"
 
-gpu_id = 0
+gpu_id = 3
 
 [network]
 topology = "mesh"

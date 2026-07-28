@@ -318,7 +318,7 @@ impl Network for MeshNetwork {
         let bind_addr: std::net::SocketAddr = format!("0.0.0.0:{}", self.config.network.p2p_port).parse().map_err(|e| format!("Failed to parse bind_addr: {}", e))?;
         let endpoint = Endpoint::builder(presets::N0)
             .ca_tls_config(iroh::tls::CaTlsConfig::insecure_skip_verify())
-            .relay_mode(iroh::RelayMode::Disabled)
+            .relay_mode(iroh::RelayMode::Default) // Enables DERP relays for NAT traversal!
             .clear_address_lookup() // Disable PKARR to stop firewall warnings
             .bind_addr(bind_addr).map_err(|e| format!("Failed to set bind_addr: {}", e))?
             .alpns(vec![ALPN.to_vec()])
