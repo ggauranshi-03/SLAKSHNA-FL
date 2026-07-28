@@ -16,4 +16,8 @@ pub trait Network: Send + Sync {
     
     fn peer_count(&self) -> usize;
     fn browser_count(&self) -> usize;
+    
+    // Blob Sync
+    async fn add_blob(&self, path: &str) -> Result<String, BoxError>;
+    async fn download_blob(&self, hash: &str, from_node: &str, out_path: &str) -> Result<(), BoxError>;
 }

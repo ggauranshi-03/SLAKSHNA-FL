@@ -1,5 +1,6 @@
 plugins:
-  optimizers: []
+  optimizers:
+    - "bhaskera.plugins.optimizers.galore"
 
 model:
   name: "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
@@ -27,7 +28,14 @@ training:
   learning_rate: 2e-3
   max_steps: 10
   optimizer:
-    backend: "default"
+    backend: "plugin"
+    name: "galore"
+    kwargs:
+      rank: 128
+      update_proj_gap: 200
+      scale: 0.25
+      proj_type: "std"
+
   distributed:
     strategy: "ddp"
 

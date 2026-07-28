@@ -18,7 +18,7 @@ pub const COMMITTEE_SIZE: usize = 4;
 pub enum LatticeBlockType {
     Proposal {
         payload_hash: String,
-        compressed_delta: String, 
+        blob_hash: String, 
     },
     Evaluation {
         target_node: String,
@@ -43,10 +43,10 @@ impl LatticeBlock {
         hasher.update(&self.node_id);
         hasher.update(&self.prev_hash);
         match &self.block_type {
-            LatticeBlockType::Proposal { payload_hash, compressed_delta } => {
+            LatticeBlockType::Proposal { payload_hash, blob_hash } => {
                 hasher.update(b"proposal");
                 hasher.update(payload_hash);
-                hasher.update(compressed_delta);
+                hasher.update(blob_hash);
             }
             LatticeBlockType::Evaluation { target_node, proposal_hash, loss_drop, trust_score } => {
                 hasher.update(b"evaluation");

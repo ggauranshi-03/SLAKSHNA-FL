@@ -262,4 +262,12 @@ impl Network for StarNetwork {
     fn browser_count(&self) -> usize {
         self.browsers.try_read().map(|b| b.len()).unwrap_or(0)
     }
+
+    async fn add_blob(&self, _path: &str) -> Result<String, BoxError> {
+        Ok(String::new())
+    }
+
+    async fn download_blob(&self, _hash: &str, _from_node: &str, _out_path: &str) -> Result<(), BoxError> {
+        Ok(())
+    }
 }

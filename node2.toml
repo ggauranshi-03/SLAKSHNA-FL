@@ -1,6 +1,7 @@
 [chain]
 chain_id = "iiitd-mainnet-1"
 chain_name = "IIITD Virtual Machine"
+training_mode = "finetuning"
 
 [block]
 block_time = 3

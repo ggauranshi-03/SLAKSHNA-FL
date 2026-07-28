@@ -33,7 +33,7 @@ struct MLEngineOutput {
     model_hash: String,
     validation_score: f64,
     metadata: String,
-    compressed_delta: String, // NEW: Catching the weights from Python
+    delta_file_path: String, // NEW: Path to the safetensors file exported by Python
 }
 
 #[tokio::main]
@@ -154,16 +154,23 @@ async fn main() -> Result<(), BoxError> {
                     for block in chain.iter().rev() {
                         if
                             let crate::chain::LatticeBlockType::Proposal {
-                                compressed_delta,
+                                blob_hash,
                                 ..
                             } = &block.block_type
                         {
-                            let path = format!("{}/{}_delta.b64", peer_deltas_dir, peer_id);
-                            let _ = std::fs::write(&path, compressed_delta);
-                            tracing::info!("📥 Network Delta Extracted: Saved {} bytes from peer {} to {}", compressed_delta.len(), peer_id, path);
-                            extracted_count += 1;
-                            found_proposal = true;
-                            break;
+                            let path = format!("{}/{}_delta.safetensors", peer_deltas_dir, peer_id);
+                            
+                            match net_l1.read().await.download_blob(blob_hash, peer_id, &path).await {
+                                Ok(_) => {
+                                    tracing::info!("📥 Network Delta Downloaded: Peer {} proposal blob_hash {}", peer_id, blob_hash);
+                                    extracted_count += 1;
+                                    found_proposal = true;
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to download blob for peer {}: {}", peer_id, e);
+                                }
+                            }
                         }
                     }
                     if !found_proposal {
@@ -194,6 +201,7 @@ async fn main() -> Result<(), BoxError> {
 
             // CRITICAL: Pass the data_dir to Python so it reads delta files from the correct path
             cmd.env("IIITD_DATA_DIR", &config_l1.node.data_dir);
+            cmd.env("TRAINING_MODE", &config_l1.chain.training_mode);
 
             // Pin this ML process to the GPU assigned in the node config
             if let Some(gid) = gpu_id_l1 {
@@ -230,8 +238,7 @@ async fn main() -> Result<(), BoxError> {
                 prev_hash: my_prev_hash,
                 block_type: crate::chain::LatticeBlockType::Proposal {
                     payload_hash: "error_hash".to_string(),
-                    // Remove storage_uri: "local".to_string(),
-                    compressed_delta: String::new(), // <--- USE THIS INSTEAD
+                    blob_hash: String::new(), // <--- TO BE FILLED AFTER ML ENGINE RUNS
                 },
                 signature: format!("node_signature_{}", epoch_start),
                 hash: String::new(),
@@ -250,10 +257,19 @@ async fn main() -> Result<(), BoxError> {
                             ml_data.validation_score
                         );
 
+                        // Upload blob to Iroh Store
+                        let actual_blob_hash = match net_l1.read().await.add_blob(&ml_data.delta_file_path).await {
+                            Ok(hash) => hash,
+                            Err(e) => {
+                                tracing::error!("Failed to upload blob to Iroh: {}", e);
+                                "error_hash".to_string()
+                            }
+                        };
+
                         // Create Proposal Block
                         my_proposal.block_type = crate::chain::LatticeBlockType::Proposal {
-                            payload_hash: ml_data.model_hash.clone(),
-                            compressed_delta: ml_data.compressed_delta.clone(),
+                            payload_hash: ml_data.model_hash,
+                            blob_hash: actual_blob_hash,
                         };
                         my_proposal.hash = my_proposal.calculate_hash();
 

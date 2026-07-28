@@ -1444,15 +1444,22 @@ def main():
     # Persist the new error
     torch.save(new_error, error_path)
     
-    buffer = io.BytesIO()
-    torch.save(sparse_delta, buffer)
+    # buffer = io.BytesIO()
+    # torch.save(sparse_delta, buffer)
+    # b64_delta = base64.b64encode(buffer.getvalue()).decode("utf-8")
     
-    b64_delta = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    # NEW: Save delta to a local safetensors file to be picked up by Iroh Blob Sync
+    rust_data_dir = os.environ.get("IIITD_DATA_DIR", f"data_{my_id}")
+    os.makedirs(rust_data_dir, exist_ok=True)
+    delta_export_path = os.path.join(rust_data_dir, f"{my_id}_export.safetensors")
+    
+    import safetensors.torch
+    safetensors.torch.save_file(sparse_delta, delta_export_path)
 
     log_runtime(
         my_id,
-        "delta_encoded",
-        delta_b64_len=str(len(b64_delta)),
+        "delta_exported",
+        delta_file_size=str(os.path.getsize(delta_export_path)),
         local_delta_path=my_delta_path,
     )
 
@@ -1494,13 +1501,11 @@ def main():
     # since we already saved the dense-sparse difference into the Error Feedback buffer!
     available_deltas = {my_id: {k: v.float().to(device) for k, v in sparse_delta.items()}}
     for j in neighbors:
-        n_delta_path = os.path.join(NETWORK_DELTAS_DIR, f"{j}_delta.b64")
+        n_delta_path = os.path.join(NETWORK_DELTAS_DIR, f"{j}_delta.safetensors")
         if os.path.exists(n_delta_path):
             try:
-                with open(n_delta_path, "r") as f:
-                    peer_b64 = f.read().strip()
-                peer_buffer = io.BytesIO(base64.b64decode(peer_b64))
-                loaded = torch.load(peer_buffer, weights_only=True, map_location=device)
+                import safetensors.torch
+                loaded = safetensors.torch.load_file(n_delta_path)
                 peer_delta = {k: v.float().to(device) for k, v in loaded.items()}
 
                 if not validate_peer_delta(peer_delta, max_allowed_norm=10.0):
@@ -1643,7 +1648,7 @@ def main():
         "model_hash": model_hash,
         "weights": w_i,
         "metadata": f"Acc: {accuracy_percentage:.1f}% | Mode: SparseLoCo",
-        "compressed_delta": b64_delta  # NEW: Sending the actual weights to Rust
+        "delta_file_path": delta_export_path  # NEW: Sending the file path to Rust for Iroh Blob Sync
     }
     print(json.dumps(output))
 

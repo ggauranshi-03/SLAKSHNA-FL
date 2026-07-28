@@ -257,6 +257,8 @@ use iroh::endpoint::presets;
 use iroh::protocol::Router;
 use iroh_gossip::net::{Gossip};
 use iroh_gossip::ALPN;
+use iroh_blobs::store::fs::FsStore as BlobStore;
+use iroh_blobs::BlobsProtocol;
 use futures::StreamExt;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
@@ -283,6 +285,7 @@ pub struct MeshNetwork {
     node_id_iroh: Arc<RwLock<Option<String>>>,
     _router: Option<iroh::protocol::Router>,
     _endpoint: Option<iroh::Endpoint>,
+    blob_store: Option<BlobStore>,
 }
 
 impl MeshNetwork {
@@ -300,6 +303,7 @@ impl MeshNetwork {
             node_id_iroh: Arc::new(RwLock::new(None)),
             _router: None,
             _endpoint: None,
+            blob_store: None,
         }
     }
 }
@@ -337,13 +341,21 @@ impl Network for MeshNetwork {
         // 2. Start Gossip Router
         let gossip = Gossip::builder().spawn(endpoint.clone());
         
-        // 3. Setup Iroh Router to accept incoming gossip connections via ALPN
+        // 2.5 Setup Blobs
+        let blobs_dir = format!("{}/blobs", self.config.node.data_dir);
+        std::fs::create_dir_all(&blobs_dir).map_err(|e| format!("Failed to create blobs dir: {}", e))?;
+        let store = BlobStore::load(&blobs_dir).await.map_err(|e| format!("Failed to load blob store: {}", e))?;
+        let blobs = BlobsProtocol::new(&store, None);
+        
+        // 3. Setup Iroh Router to accept incoming gossip & blobs connections via ALPN
         let router = Router::builder(endpoint.clone())
             .accept(ALPN, gossip.clone())
+            .accept(iroh_blobs::ALPN, blobs)
             .spawn();
 
         self._router = Some(router);
         self._endpoint = Some(endpoint.clone());
+        self.blob_store = Some(store);
 
         info!("📡 Iroh Router started (listening on port {})", self.config.network.p2p_port);
 
@@ -503,5 +515,29 @@ impl Network for MeshNetwork {
 
     fn browser_count(&self) -> usize {
         0
+}
+
+    async fn add_blob(&self, path: &str) -> Result<String, BoxError> {
+        let store = self.blob_store.as_ref().ok_or("Blob store not initialized")?;
+        let abs_path = std::path::absolute(path)?;
+        let tag = store.blobs().add_path(abs_path).await?;
+        Ok(tag.hash.to_string())
+    }
+
+    async fn download_blob(&self, hash_str: &str, from_node: &str, out_path: &str) -> Result<(), BoxError> {
+        let store = self.blob_store.as_ref().ok_or("Blob store not initialized")?;
+        let endpoint = self._endpoint.as_ref().ok_or("Endpoint not initialized")?;
+        
+        let hash: iroh_blobs::Hash = hash_str.parse()?;
+        // iroh::PublicKey implements ContentDiscovery for passing a specific node
+        let peer_id: iroh::PublicKey = from_node.parse().map_err(|_| "Failed to parse NodeId")?;
+        
+        let downloader = store.downloader(endpoint);
+        downloader.download(hash, Some(peer_id)).await?;
+        
+        let abs_path = std::path::absolute(out_path)?;
+        store.blobs().export(hash, abs_path).await?;
+        
+        Ok(())
     }
 }

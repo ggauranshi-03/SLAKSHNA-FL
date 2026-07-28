@@ -22,6 +22,12 @@ pub struct Config {
 pub struct ChainConfig {
     pub chain_id: String,
     pub chain_name: String,
+    #[serde(default = "default_training_mode")]
+    pub training_mode: String,
+}
+
+fn default_training_mode() -> String {
+    "finetuning".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
