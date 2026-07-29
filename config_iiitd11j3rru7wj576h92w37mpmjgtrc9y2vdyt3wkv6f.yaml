@@ -33,8 +33,7 @@ monitoring:
   metrics_export_port: 9659
 output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11j3rru7wj576h92w37mpmjgtrc9y2vdyt3wkv6f
 plugins:
-  optimizers:
-  - bhaskera.plugins.optimizers.galore
+  optimizers: []
 training:
   batch_size: 4
   distributed:
@@ -44,13 +43,7 @@ training:
   lr: 2e-3
   max_steps: 50
   optimizer:
-    backend: plugin
-    kwargs:
-      proj_type: std
-      rank: 128
-      scale: 0.25
-      update_proj_gap: 200
-    name: galore
+    backend: default
   output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11j3rru7wj576h92w37mpmjgtrc9y2vdyt3wkv6f
   save_steps: 5
   save_strategy: steps

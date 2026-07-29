@@ -877,10 +877,14 @@ def prepare_bhaskera_config(my_id, is_malicious, training_mode="finetuning"):
     config["training"]["save_steps"] = 5
     config["training"]["save_total_limit"] = 1
     
-    # FIX: Disable warmup! Since Bhaskera restarts every FL round (epoch) and only runs 
-    # for 5-10 steps per round before exiting, a 100-step warmup means the LR never 
-    # exceeds a microscopic value (e.g. 1e-5) and the weights basically don't update.
-    config["training"]["warmup_steps"] = 0
+    # Lower the learning rate drastically to prevent the massive intra-epoch loss spikes.
+    # The default 2e-3 was too aggressive. 1e-4 provides a smooth, stable descent.
+    config["training"]["lr"] = 1e-4
+    config["training"]["learning_rate"] = 1e-4
+    
+    # Re-enable a very short warmup (2 steps) so the model doesn't take massive jumps 
+    # on the very first batch, but still reaches peak LR before the 5-step epoch ends.
+    config["training"]["warmup_steps"] = 2
 
     # Prevent port collisions when multiple nodes run on the same machine
     if "monitoring" not in config:
