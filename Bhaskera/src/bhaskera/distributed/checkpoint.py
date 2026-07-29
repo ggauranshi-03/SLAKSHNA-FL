@@ -109,6 +109,7 @@ def save_checkpoint(
     extra: dict | None = None,
     rank: int = 0,
     keep_last_n: int = 3,
+    cursor_meta: dict | None = None,
 ) -> None:
     """
     Save a sharded checkpoint atomically.
@@ -167,11 +168,37 @@ def save_checkpoint(
         meta: dict = {"step": int(step)}
         if extra:
             meta.update(extra)
+        if cursor_meta:
+            meta.update(cursor_meta)
         with open(os.path.join(path, "meta.json"), "w") as f:
             json.dump(meta, f)
 
         # Write sentinel — this is the last thing written
         open(os.path.join(path, ".complete"), "w").close()
+        
+        # FIX: Save HuggingFace/PEFT Safetensors format alongside PyTorch DCP manually
+        # Extract directly from model.named_parameters() — guaranteed real post-training values!
+        # Do NOT re-import StateDictOptions here (it's module-level) or Python scoping will
+        # make it an unbound local at line 150.
+        try:
+            from safetensors.torch import save_file
+            import re as _re
+            lora_sd = {}
+            for name, param in model.named_parameters():
+                if "lora_" in name:
+                    # Strip DDP 'module.' prefix if present
+                    clean_k = name[len("module."):] if name.startswith("module.") else name
+                    # Normalize adapter name: lora_A.default.weight -> lora_A.weight
+                    # PEFT's get_peft_model_state_dict strips the adapter name
+                    clean_k = _re.sub(r'(lora_[AB])\.[^.]+\.(weight)', r'\1.\2', clean_k)
+                    lora_sd[clean_k] = param.data.detach().cpu().float().contiguous()
+            if lora_sd:
+                save_file(lora_sd, os.path.join(path, "adapter_model.safetensors"))
+                logger.info(f"Saved {len(lora_sd)} LoRA tensors to adapter_model.safetensors")
+            else:
+                logger.warning("No lora_ keys found in model.named_parameters()!")
+        except Exception as e:
+            logger.warning(f"Failed to save adapter_model.safetensors: {e}")
 
         save_dir = str(Path(path).parent)
         _cleanup_old_checkpoints(save_dir, keep_last_n)
@@ -195,11 +222,13 @@ def maybe_resume(
     Scan save_dir for the latest checkpoint that has a .complete sentinel.
     Load it in-place and return the step to resume from.
 
-    Returns 0 if no valid checkpoint is found (fresh start).
+     Returns (0, {}) if no valid checkpoint is found (fresh start).
+    Returns (step, meta_dict) where meta_dict contains all keys from
+    meta.json, including eval_lifecycle/* cursor keys when present.
     """
     if not os.path.isdir(save_dir):
         logger.info("No checkpoint directory found. Starting from step 0.")
-        return 0
+        return 0, {}
 
     candidates = sorted([
         p for p in Path(save_dir).iterdir()
@@ -210,7 +239,7 @@ def maybe_resume(
 
     if not candidates:
         logger.info("No valid checkpoints found (missing .complete sentinel). Starting from step 0.")
-        return 0
+        return 0,{}
 
     ckpt_path  = str(candidates[-1])
     start_step = int(_STEP_RE.search(ckpt_path).group(1))
@@ -233,13 +262,14 @@ def maybe_resume(
 
     # Read step from meta.json (ground truth)
     meta_path = os.path.join(ckpt_path, "meta.json")
+    meta: dict = {}
     if os.path.exists(meta_path):
         with open(meta_path) as f:
             meta = json.load(f)
         start_step = int(meta.get("step", start_step))
 
     logger.info(f"Resume complete — starting from step {start_step}")
-    return start_step
+    return start_step,meta
 
 
 # ---------------------------------------------------------------------------
