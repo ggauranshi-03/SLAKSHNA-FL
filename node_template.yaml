@@ -6,31 +6,31 @@ model:
 
 data:
   # To be overridden by ml_engine.py
-  dataset_name: "dummy"
+  name: "dummy"
   tokenized_path: "dummy"
-  sequence_length: 512
-  format_renderer: "chatml"
+  seq_len: 512
+  format: "chatml"
 
 lora:
-  enabled: true
-  rank: 8
+  enabled: false
+  r: 8
   alpha: 16
   dropout: 0.05
   target_modules: ["q_proj", "v_proj"]
 
 training:
   batch_size: 4
-  gradient_accumulation_steps: 2
-  learning_rate: 2e-4
+  grad_accum: 2
+  lr: 2e-4
   max_steps: 10
   distributed:
     strategy: "ddp"
 
 checkpoint:
   # To be overridden by ml_engine.py
-  save_directory: "dummy"
+  save_dir: "dummy"
   save_interval: 5
-  retention: 1
+  keep_last_n: 1
 
 logging:
   tracker: "none"
