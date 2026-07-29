@@ -1,0 +1,44 @@
+checkpoint:
+  checkpoint_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89
+  enabled: true
+  retention: 1
+  save_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89
+  save_directory: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89
+  save_interval: 1
+data:
+  cache_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89/tokenized_cache
+  dataset_name: timdettmers/openassistant-guanaco
+  format_renderer: chatml
+  max_train_samples: 80
+  sequence_length: 512
+  tokenized_path: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/data/data_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89/tokenized_cache/ultrachat_b1331b3f65d80c47
+logging:
+  tracker: none
+lora:
+  alpha: 16
+  dropout: 0.05
+  enabled: true
+  rank: 8
+  target_modules:
+  - q_proj
+  - v_proj
+model:
+  dtype: bfloat16
+  name: TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T
+  trust_remote_code: true
+  use_liger_kernel: false
+monitoring:
+  dashboard_port: 8284
+  metrics_export_port: 9284
+output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89
+training:
+  batch_size: 4
+  distributed:
+    strategy: ddp
+  gradient_accumulation_steps: 2
+  learning_rate: 2e-4
+  max_steps: 15
+  output_dir: /mnt/disk1/slakshna/slakshnaFL/SLAKSHNA/ml_models/ckpt_iiitd11mt0862nk7j4rqhry9dsypeayhvrg58fsxcqv89
+  save_steps: 5
+  save_strategy: steps
+  save_total_limit: 1
