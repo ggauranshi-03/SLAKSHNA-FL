@@ -42,10 +42,10 @@ host = "0.0.0.0"
 p2p_port = 9001
 ws_port = 8547
 api_port = 8555
-boot_nodes = [""]
+boot_nodes = ["bae9eca7308a8ee1fe282353e7d384ecda1bc02b5fac9989a4038d304a315459@172.6.3.17:9000"]
 
 [network.star]
-master_url = "http://192.168.22.23:8545"
+master_url = "http://14.139.62.247:8545"
 
 [validators]
 addresses = []
