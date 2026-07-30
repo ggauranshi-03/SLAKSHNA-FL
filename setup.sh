@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
-BASE_DIR=$(realpath ../..)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+BASE_DIR=$(realpath "$SCRIPT_DIR/..") # Default to one level up
+
+# Intelligently search for the workspace root containing 'Bhaskera'
+if [ -d "$SCRIPT_DIR/../../Bhaskera" ]; then
+    BASE_DIR=$(realpath "$SCRIPT_DIR/../..")
+elif [ -d "$SCRIPT_DIR/../Bhaskera" ]; then
+    BASE_DIR=$(realpath "$SCRIPT_DIR/..")
+elif [ -d "$SCRIPT_DIR/Bhaskera" ]; then
+    BASE_DIR="$SCRIPT_DIR"
+fi
 
 echo "=== 1. Setting up Python Environment ==="
 # Check if Bhaskera central activation script exists
@@ -24,8 +34,7 @@ pip install --upgrade pip
 pip install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml
 
 echo "=== 2. Updating Hardcoded Paths ==="
-# Assuming the script runs from within slakshnaFL/SLAKSHNA, the base dir is two levels up.
-BASE_DIR=$(realpath ../..)
+# Using the dynamically detected BASE_DIR from above
 echo "Setting base directory to: $BASE_DIR"
 if [ "$BASE_DIR" != "/mnt/disk1/slakshna" ]; then
     sed -i "s|/mnt/disk1/slakshna|$BASE_DIR|g" ml_engine.py
