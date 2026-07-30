@@ -331,7 +331,7 @@ def get_adapter_path(ckpt_dir):
     return best_path
 
 
-def sparsify_tensor(tensor, sparsity=0.1):
+def sparsify_tensor(tensor, sparsity=0.01):
     """SparseLoCo Top-K Sparsification: Keeps only the top 1% of weights."""
     if tensor.numel() == 0:
         return tensor

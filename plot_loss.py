@@ -18,12 +18,20 @@ df_step1 = df_step1.sort_values('epoch')
 
 # Plotting
 plt.figure(figsize=(10, 6))
-plt.plot(df_step1['epoch'], df_step1['loss'], marker='o', linestyle='-', color='b', linewidth=2, markersize=8)
+
+unique_nodes = df_step1['node_id'].unique()
+for node in unique_nodes:
+    node_data = df_step1[df_step1['node_id'] == node]
+    # Keep node name short for legend
+    label = node[:8] + "..." if len(node) > 8 else node
+    plt.plot(node_data['epoch'], node_data['loss'], marker='o', linestyle='-', linewidth=2, markersize=8, label=label)
+
 plt.title('Global Model Loss at Step 1 of Each Epoch', fontsize=16)
 plt.xlabel('Epoch', fontsize=14)
 plt.ylabel('Loss (Step 1)', fontsize=14)
 plt.grid(True, linestyle='--', alpha=0.7)
-plt.xticks(df_step1['epoch'])
+plt.xticks(sorted(df_step1['epoch'].unique()))
+plt.legend()
 
 # Save to the current directory
 local_plot_path = "epoch_loss_step1.png"

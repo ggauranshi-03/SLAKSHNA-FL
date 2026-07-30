@@ -334,7 +334,7 @@ async fn main() -> Result<(), BoxError> {
             }
 
             // 2. MID-EPOCH SYNC: Intelligent Sync Barrier
-            let target_l1_time = epoch_start + 45;
+            let target_l1_time = epoch_start + 300;
 
             tracing::info!("⏳ Waiting for ML submissions to propagate across network...");
 

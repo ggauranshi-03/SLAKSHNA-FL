@@ -15,3 +15,5 @@ benchmark_data
 /data*
 *.pyc
 .*
+config_*
+patch_*

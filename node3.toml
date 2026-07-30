@@ -43,7 +43,7 @@ p2p_port = 9002
 ws_port = 8548
 api_port = 8556
 boot_nodes = [
-    "f656e599df9c7d321c07bfdfaf9152ff3ea12d395d7c7a831815a74eb1f84ac5@127.0.0.1:9000"
+    "f750f69958bdcb144ed916aff764ad321a1d0d78dc7dbbc4d7b3760d1732f33c@127.0.0.1:9000"
 ]
 
 [network.star]

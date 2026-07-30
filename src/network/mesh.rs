@@ -146,7 +146,7 @@
 //                             P2PMessage::NewLatticeBlock(_) => {
 //                                 let data = serde_json::to_vec(&msg).unwrap();
 //                                 if let Err(e) = gossip_sender.broadcast(data.into()).await {
-//                                     debug!("Failed to broadcast gossip message: {:?}", e);
+//                                     error!("Failed to broadcast gossip message: {:?}", e);
 //                                 }
 //                             }
 //                             _ => continue,
@@ -335,7 +335,9 @@ impl Network for MeshNetwork {
         }
 
         // 2. Start Gossip Router
-        let gossip = Gossip::builder().spawn(endpoint.clone());
+        let gossip = Gossip::builder()
+            .max_message_size(10_485_760) // 10 MB limit for large AI payloads
+            .spawn(endpoint.clone());
         
         // 3. Setup Iroh Router to accept incoming gossip connections via ALPN
         let router = Router::builder(endpoint.clone())
@@ -411,7 +413,7 @@ impl Network for MeshNetwork {
                                 let size_mb = size_bytes as f64 / 1_048_576.0;
                                 info!("📤 Broadcasting Lattice Block to Swarm | Network Payload Size: {} bytes ({:.2} MB)", size_bytes, size_mb);
                                 if let Err(e) = gossip_sender.broadcast(data.into()).await {
-                                    debug!("Failed to broadcast gossip message: {:?}", e);
+                                    error!("Failed to broadcast gossip message: {:?}", e);
                                 }
                             }
                             _ => continue,
