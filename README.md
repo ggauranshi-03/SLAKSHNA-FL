@@ -117,12 +117,26 @@ fi
 
 ### Installation & Build
 
-```bash
-# Upgrade pip and install core ML/FL dependencies
-pip install --upgrade pip
-pip install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml setproctitle toml
+Follow these exact steps in sequence to set up the environment and build the project:
 
-# Build the Rust P2P node binary in release mode
+```bash
+# 1. Run the SLAKSHNA root setup script
+bash setup.sh
+./setup.sh
+
+# 2. Navigate to the Bhaskera subdirectory and run its setup script
+cd Bhaskera
+bash setup.sh
+./setup.sh
+
+# 3. Activate the Bhaskera Python virtual environment
+source bhaskera-activate.sh
+
+# 4. Move back to the SLAKSHNA root directory
+cd ..
+
+# 5. Build the Rust P2P node binary in release mode
+# (Make sure you have Rust and Cargo installed)
 cargo build --release
 ```
 
