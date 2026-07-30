@@ -192,3 +192,11 @@ timestamp,node_id,loss,perplexity
 2026-07-30 16:41:25,iiitd11g6sd35jtsdhyenlu5kc4mm9jptq54v477k2au3,33,0.0,0.0,90.0
 2026-07-30 16:41:39,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,1.9778,7.226826
 2026-07-30 16:41:44,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,25,0.0,0.0,90.0
+2026-07-30 16:51:24,iiitd11g6sd35jtsdhyenlu5kc4mm9jptq54v477k2au3,1.9736,7.196537
+2026-07-30 16:51:27,iiitd11g6sd35jtsdhyenlu5kc4mm9jptq54v477k2au3,34,0.0,0.0,90.0
+2026-07-30 16:51:36,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,1.9736,7.196537
+2026-07-30 16:51:41,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,26,0.0,0.0,90.0
+2026-07-30 17:01:24,iiitd11g6sd35jtsdhyenlu5kc4mm9jptq54v477k2au3,1.9654,7.137767
+2026-07-30 17:01:27,iiitd11g6sd35jtsdhyenlu5kc4mm9jptq54v477k2au3,35,0.0,0.0,90.0
+2026-07-30 17:01:36,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,1.9654,7.137767
+2026-07-30 17:01:41,iiitd1184xy88pdzdaaeuwumrpg5awpp776zsv5mqnkrc,27,0.0,0.0,90.0
