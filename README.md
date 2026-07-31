@@ -1,34 +1,34 @@
 # SLAKSHNA — Decentralized Geo-Localised Personalized Federated Learning
 
-A **Peer-to-Peer Federated Learning Framework** built in **Rust** and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA** enables decentralized, privacy-preserving, weighted Federated Learning (FL) without centralized aggregators or synchronous blocking rounds. It runs across geo-localized machines and institutional clusters (including SLURM GPU supercomputers) separated by complex firewalls, securely sharing compressed model updates without any central coordinator.
+A **Peer-to-Peer Federated Learning Framework** built in **Rust** and integrated with a high-performance Python Machine Learning Engine (**Bhaskera**). **SLAKSHNA** enables decentralized, privacy-preserving, weighted-aggregation Federated Learning (FL) without centralized aggregators or synchronous blocking rounds. It runs across geo-localized machines and institutional clusters (including SLURM-managed supercomputers, kubernetes managed clusters) separated by complex firewalls, securely sharing compressed model updates without any central coordinator.
 
 ---
 
 ## Key Features & Architectural Highlights
 
 - **Asynchronous P2P Training**  
-  Instead of traditional synchronous FL rounds (`FedAvg`) waiting for slow participants, SLAKSHNA operates asynchronously. Nodes continuously train on local data, broadcast compressed model deltas to the network, and evaluate peers dynamically.
+  Instead of traditional synchronous FL rounds waiting for slow participants, SLAKSHNA operates asynchronously. Nodes continuously train on local data, broadcast compressed model deltas to the network, and evaluate peers dynamically.
 
-- **Iroh QUIC Mesh & Gossip Network (`iroh-gossip`)**  
-  Built on modern **Iroh v1.0.2**, the framework utilizes **QUIC** transport, direct NAT traversal (STUN/DERP), and `iroh-gossip` topic swarms. Nodes discover peers dynamically using cryptographic Ed25519 `NodeId` public keys.
+- **Iroh QUIC Mesh & Gossip Network (`iroh-gossip`)** 
+  Built on **Iroh v1.0.2**, the framework utilizes **QUIC (Quick UDP (User Datagram Protocol) Internet Connections)** transport, direct NAT (Network Address Translation) traversal (STUN/DERP), and `iroh-gossip` topic swarms. Nodes discover peers dynamically using cryptographic Ed25519 `NodeId` public keys.
 
 - **Universal Firewall & VPN Traversal (`Playit.gg`)**  
-  Academic and enterprise networks (such as IIITD campus firewalls or remote VPNs) often block inbound UDP/TCP hole-punching and standard DERP relay traffic. SLAKSHNA natively supports static public UDP/TCP tunneling via **Playit.gg**, providing fixed, persistent public addresses (`<ip>:<port>`) for nodes across different cities without requiring root/sudo access or complex router configurations.
+  Academic and enterprise networks (such as university campus firewalls or remote VPNs) often block inbound UDP/TCP hole-punching and standard DERP relay traffic. SLAKSHNA natively supports static public UDP/TCP tunneling via **Playit.gg**, providing fixed, persistent public addresses (`<ip>:<port>`) for nodes across different cities without requiring root/sudo access or complex router configurations.
 
 - **Bhaskera ML Engine (`ml_engine.py`)**  
-  A robust Python engine bridging the Rust networking layer with distributed GPU/CPU training. Powered by **Ray Train (`TorchTrainer`)**, **PyTorch**, and **HuggingFace PEFT (LoRA)**, it executes local fine-tuning on tokenized datasets while streaming real-time epoch loss tracking.
+  A robust Python engine bridging the Rust networking layer with distributed GPU/CPU training. Powered by **Ray Train (`TorchTrainer`)**, **PyTorch**, and **parameter efficient training algorithms**, it executes local pre-training, and fine-tuning on tokenized datasets while streaming real-time epoch loss tracking. During training it can offload the optimizer states to perform **concurrent evals** on the model.
 
 - **SLURM Supercomputer & Multi-Core Cluster Support**  
-  Fully compatible with academic SLURM clusters (`srun` / `sbatch`). Because SLURM isolates allocated GPUs inside containers where the index is always `CUDA_VISIBLE_DEVICES=0`, SLAKSHNA's node configuration (`gpu_id`) seamlessly maps to cluster-assigned resources without port collisions or resource deadlocks.
+  Fully compatible with HPC SLURM clusters (`srun` / `sbatch`). SLURM isolates allocated GPUs seamlessly and maps to cluster-assigned resources without port collisions or resource deadlocks.
 
-- **Reputation & Trust-Weighted Aggregation**  
-  Peers asynchronously evaluate incoming model proposals by computing cosine similarity against their local gradient direction and tracking validation loss improvements. Nodes dynamically update peer trust scores (`state["alpha"]` and normalized `w_i` weights) and aggregate updates based on these scores.
+- **Weighted Aggregation**  
+  Peers asynchronously evaluate incoming model proposals by computing cosine similarity against their local gradient direction and tracking validation loss improvements. Nodes dynamically update peer weights (`state["alpha"]` and normalized `w_i` weights) and aggregate updates based on these weights. It checks not only malicious updates but also provides foundation for mitigating catastrophic forgetting.
 
-- **Top-K Sparsification (`SparseLoCo`) & Bandwidth Compression**  
-  Before broadcasting over the P2P network, local LoRA weight updates are sparsified to retain only the top 1% most significant weights (`sparsity=0.01`). The sparse tensors are half-precision encoded (`fp16`) and base64 compressed, slashing network bandwidth requirements by over 98%.
+- **Sparsification and Compression**  
+  Before broadcasting over the P2P network, local weight updates are sparsified to retain only the most significant weights (e.g., `sparsity=0.01`). The sparse tensors are encoded (e.g., `fp16`, `fp8`) and base64 compressed, reducing network bandwidth requirements by over 98%.
 
 - **Differential Privacy (DP)**  
-  Integrated with `opacus` (`PrivacyEngine`) and `opt-einsum` to ensure local gradients are cryptographically protected against membership inference and model inversion attacks.
+  L2 norm clipping, Gaussian noise etc. augmented to ensure Differential Privacy for local gradients protected against membership inference and model inversion attacks. Our differential privacy component also allows integrating `opacus` (`PrivacyEngine`) and `opt-einsum`.
 
 ---
 
@@ -37,14 +37,14 @@ A **Peer-to-Peer Federated Learning Framework** built in **Rust** and integrated
 SLAKSHNA is built from the ground up to operate securely over untrusted public networks, proxies, and shared supercomputers:
 
 1. **End-to-End Cryptographic Transport (`TLS 1.3 over QUIC`)**  
-   Every node generates an `Ed25519` cryptographic keypair upon startup (`src/network/mesh.rs`). All communication across the Iroh mesh—whether sent directly via local IPs or routed across public internet tunnels like `Playit.gg`—is wrapped in end-to-end **TLS 1.3** encryption.
-   - **Zero-Trust Tunnels:** Public proxy services (`Playit.gg`) act purely as raw packet forwarders. They cannot read, decrypt, or tamper with model weights because they do not hold the private keys.
+   Every node generates an `Ed25519` cryptographic keypair upon startup (`src/network/mesh.rs`). All communication across the Iroh mesh, whether sent directly via local IPs or routed across public internet tunnels like `Playit.gg`, is wrapped in end-to-end **TLS 1.3** encryption.
+   - **Zero-Trust Tunnels:** Public proxy services (`Playit.gg`) act purely as raw packet forwarders. They cannot read, decrypt, or tamper with model weights because they do not hold the private keys. This mechanism consistently saves both subscription and storage on services such as Cloudflare.
 
-2. **Byzantine Fault Tolerant (BFT) Poisoning Defense**  
+2. **Poisoning Defense**  
    To prevent adversarial nodes from ruining the global model (`Model Poisoning`), SLAKSHNA does not use simple averaging. When a node receives a peer's delta, `ml_engine.py` evaluates the proposal against local validation metrics (`Cosine Similarity` & `Validation Loss`). If a node submits poisoned or erratic updates, its trust score (`alpha`) drops, rendering its weight in the Federated Averaging formula close to `0.0`.
 
 3. **Differential Privacy against Data Reconstruction**  
-   By combining `SparseLoCo` (sharing only 1% of fine-tuned LoRA weights) with `Opacus` gradient clipping and noise injection, raw local dataset samples (`ultrachat`, patient records, etc.) can never be reconstructed by eavesdroppers or peer nodes.
+   By combining sparsification/compression with differential privacy, raw local dataset samples (e.g., chat dataset, patient records, etc.) can never be reconstructed by eavesdroppers or peer nodes.
 
 ---
 
@@ -60,7 +60,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 │  • Iroh Mesh & Gossip Protocol   │  • ml_engine.py Bridge              │
 │  • Decentralized Sync            │  • Bhaskera (Ray Train / PyTorch)   │
 │  • Local State Persistence       │  • LoRA Fine-Tuning & SparseLoCo    │
-│  • Asynchronous Evaluation       │  • Opacus Differential Privacy      │
+│  • Asynchronous Evaluation       │  • Differential Privacy             │
 ├──────────────────────────────────┴─────────────────────────────────────┤
 │                    Iroh Network (`iroh-gossip`)                        │
 │          (QUIC / Ed25519 TLS 1.3 / mDNS / STUN / Playit.gg)            │
@@ -78,7 +78,7 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 | **API & WebSockets** | **Axum 0.7**, **Hyper**, **tokio-tungstenite** (`WebSocket`), **Serde / Serde JSON** |
 | **ML Engine & FL** | **Python 3.11+**, **PyTorch**, **Ray / Ray Train** (`ray.train.torch.TorchTrainer`), **setproctitle** |
 | **Transformers & PEFT** | **HuggingFace Transformers**, **PEFT** (`LoRA`), **PyArrow** (Parquet caching), **PyYAML** |
-| **Differential Privacy** | **Opacus** (`PrivacyEngine`), **opt-einsum**, **SciPy**, **NumPy** |
+| **Differential Privacy** | **Gradient clipping**, **Noice injection**, **Opacus** (`PrivacyEngine`), **opt-einsum**|
 
 ---
 
@@ -107,7 +107,7 @@ export CARGO_HOME=/mnt/disk1/slakshna/rust/.cargo
 export RUSTUP_HOME=/mnt/disk1/slakshna/rust/.rustup
 export PATH=$CARGO_HOME/bin:$PATH
 
-# 2. Activate Python Environment
+# 2. Activate Python Environment (e.g., using uv, poetry, etc.)
 if [ -f "/mnt/disk1/slakshna/Bhaskera/bhaskera-activate.sh" ]; then
     source /mnt/disk1/slakshna/Bhaskera/bhaskera-activate.sh
 elif [ -f ".venv/bin/activate" ]; then
