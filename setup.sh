@@ -4,13 +4,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 BASE_DIR=$(realpath "$SCRIPT_DIR/..") # Default to one level up
 
-# Intelligently search for the workspace root containing 'Bhaskera'
-if [ -d "$SCRIPT_DIR/../../Bhaskera" ]; then
-    BASE_DIR=$(realpath "$SCRIPT_DIR/../..")
+# Intelligently search for the workspace root containing 'Bhaskera', starting from closest
+if [ -d "$SCRIPT_DIR/Bhaskera" ]; then
+    BASE_DIR="$SCRIPT_DIR"
 elif [ -d "$SCRIPT_DIR/../Bhaskera" ]; then
     BASE_DIR=$(realpath "$SCRIPT_DIR/..")
-elif [ -d "$SCRIPT_DIR/Bhaskera" ]; then
-    BASE_DIR="$SCRIPT_DIR"
+elif [ -d "$SCRIPT_DIR/../../Bhaskera" ]; then
+    BASE_DIR=$(realpath "$SCRIPT_DIR/../..")
 fi
 
 echo "=== 1. Setting up Python Environment ==="
@@ -18,20 +18,26 @@ echo "=== 1. Setting up Python Environment ==="
 if [ -f "$BASE_DIR/Bhaskera/bhaskera-activate.sh" ]; then
     echo "🔍 Detected Bhaskera environment! Activating via $BASE_DIR/Bhaskera/bhaskera-activate.sh..."
     source "$BASE_DIR/Bhaskera/bhaskera-activate.sh"
-elif [ -f "../../Bhaskera/bhaskera-activate.sh" ]; then
-    echo "🔍 Detected Bhaskera environment! Activating via ../../Bhaskera/bhaskera-activate.sh..."
-    source ../../Bhaskera/bhaskera-activate.sh
-elif [ -f "../Bhaskera/bhaskera-activate.sh" ]; then
-    echo "🔍 Detected Bhaskera environment! Activating via ../Bhaskera/bhaskera-activate.sh..."
-    source ../Bhaskera/bhaskera-activate.sh
 else
     echo "📦 Creating local Python virtual environment (.venv)..."
     python3 -m venv .venv
     source .venv/bin/activate
 fi
 
-pip install --upgrade pip
-pip install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml
+if command -v pip &>/dev/null; then
+    PIP_CMD="pip"
+elif command -v uv &>/dev/null; then
+    PIP_CMD="uv pip"
+elif python3 -m pip --version &>/dev/null; then
+    PIP_CMD="python3 -m pip"
+else
+    echo "📦 pip not found! Ensuring pip is installed..."
+    python3 -m ensurepip --upgrade
+    PIP_CMD="python3 -m pip"
+fi
+
+$PIP_CMD install --upgrade pip || true
+$PIP_CMD install torch torchvision numpy scipy opt-einsum opacus pyarrow ray pyyaml
 
 echo "=== 2. Updating Hardcoded Paths ==="
 # Using the dynamically detected BASE_DIR from above

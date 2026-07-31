@@ -12,8 +12,9 @@ except ImportError:
 
 # CRITICAL: Force all caching and temp files to the massive disk1 drive 
 # because the root /home/ partition is 100% full!
-os.environ["HF_HOME"] = "/mnt/disk1/slakshna/hf_cache"
-os.environ["XDG_CACHE_HOME"] = "/mnt/disk1/slakshna/cache"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.environ["HF_HOME"] = os.path.join(BASE_DIR, "hf_cache")
+os.environ["XDG_CACHE_HOME"] = os.path.join(BASE_DIR, "cache")
 
 # Isolate temp directories per node to prevent Ray GCS collisions
 # CRITICAL: Linux AF_UNIX sockets strictly fail if path > 107 chars! 
@@ -21,7 +22,7 @@ os.environ["XDG_CACHE_HOME"] = "/mnt/disk1/slakshna/cache"
 if len(sys.argv) > 1 and sys.argv[1] != "--help":
     my_id_arg = sys.argv[1]
     short_id = my_id_arg[-6:] if len(my_id_arg) > 6 else my_id_arg
-    node_tmp = f"/mnt/disk1/slakshna/t/{short_id}"
+    node_tmp = f"/tmp/sl_t_{short_id}"
     os.makedirs(node_tmp, exist_ok=True)
     os.environ["RAY_TMPDIR"] = node_tmp
     os.environ["TMPDIR"] = node_tmp
@@ -34,9 +35,9 @@ if len(sys.argv) > 1 and sys.argv[1] != "--help":
     os.environ["RAY_NODE_MANAGER_PORT"] = str(13000 + port_offset)
     os.environ["RAY_OBJECT_MANAGER_PORT"] = str(14000 + port_offset)
 else:
-    os.makedirs("/mnt/disk1/slakshna/t/shared", exist_ok=True)
-    os.environ["RAY_TMPDIR"] = "/mnt/disk1/slakshna/t/shared"
-    os.environ["TMPDIR"] = "/mnt/disk1/slakshna/t/shared"
+    os.makedirs("/tmp/sl_t_shared", exist_ok=True)
+    os.environ["RAY_TMPDIR"] = "/tmp/sl_t_shared"
+    os.environ["TMPDIR"] = "/tmp/sl_t_shared"
 
 import torch
 import numpy as np
