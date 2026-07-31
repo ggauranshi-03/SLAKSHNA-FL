@@ -86,15 +86,19 @@ SLAKSHNA is built from the ground up to operate securely over untrusted public n
 
 | Path | Description |
 | :--- | :--- |
-| `src/main.rs` | Node entry point, phase execution, ML process orchestration, and P2P broadcast |
-| `src/network/` | Iroh QUIC + Gossip network implementation (`mesh.rs`, `mod.rs`, `star.rs`) for peer synchronization |
-| `src/api.rs` | Axum HTTP REST endpoints and real-time WebSocket broadcast server |
-| `src/config.rs` | TOML configuration loader for network ports and storage paths |
-| `ml_engine.py` | Python bridge executing Bhaskera distributed LoRA training, sparsification (`SparseLoCo`), and evaluation |
-| `Bhaskera/` | Submodule / embedded repository containing the Bhaskera distributed LLM training framework |
+| `src/main.rs` | Rust Node entry point, phase execution, P2P orchestrator, and network broadcast |
+| `src/network/` | Iroh QUIC + Gossip network implementation (`mesh.rs`, `mod.rs`, `star.rs`) for secure peer synchronization |
+| `src/api.rs` | Axum HTTP REST endpoints and real-time WebSocket broadcast server for dashboards |
+| `src/config.rs` | TOML configuration loader for network ports, IDs, and storage paths |
+| `ml_engine.py` | Python ML bridge executing Bhaskera distributed LoRA training, DP clipping, sparsification (`SparseLoCo`), and peer evaluation |
+| `setup.sh` | Main installation script for system dependencies and virtual environments |
+| `Bhaskera/` | Submodule / embedded repository containing the distributed LLM training framework |
+| `node_template.yaml` | Base YAML template for HuggingFace / Ray / PEFT training arguments |
 | `config.toml` | Master/Node-1 configuration file |
 | `node2.toml` / `node3.toml` | Peer node configuration files |
-
+| `logs/` | Directory containing runtime communication logs and real-time epoch loss tracking CSVs |
+| `plots_script/` | Python scripts for visualizing training metrics, trust scores, and system performance |
+| `results/` | Output directory containing generated plots and evaluation metric graphs |
 ---
 
 ## Environment & Prerequisites Setup
