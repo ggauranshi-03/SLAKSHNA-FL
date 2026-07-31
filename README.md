@@ -120,24 +120,27 @@ fi
 Follow these exact steps in sequence to set up the environment and build the project:
 
 ```bash
-# 1. Run the SLAKSHNA root setup script
-bash setup.sh
-./setup.sh
-
-# 2. Navigate to the Bhaskera subdirectory and run its setup script
+# 1. Navigate to the Bhaskera ML engine directory
 cd Bhaskera
+
+# 2. Run the Bhaskera setup script (installs python dependencies)
 bash setup.sh
-./setup.sh
 
 # 3. Activate the Bhaskera Python virtual environment
 source bhaskera-activate.sh
 
-# 4. Move back to the SLAKSHNA root directory
+# 4. Move back to the SLAKSHNA-FL root directory
 cd ..
 
-# 5. Build the Rust P2P node binary in release mode
-# (Make sure you have Rust and Cargo installed)
+# 5. Run the SLAKSHNA root setup script
+bash setup.sh
+
+# 6. Build the Rust P2P node binary in release mode
+# (Make sure you have Rust and Cargo installed!)
 cargo build --release
+
+# 7. You are now ready to run your nodes!
+# (e.g. ./target/release/iiitd --config config.toml)
 ```
 
 ---
